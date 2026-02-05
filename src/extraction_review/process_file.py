@@ -9,7 +9,6 @@ from typing import Annotated, Any, Literal
 import httpx
 from llama_cloud import AsyncLlamaCloud
 from llama_cloud.types.beta.extracted_data import ExtractedData, InvalidExtractionData
-from llama_cloud.types.file_query_params import Filter
 from pydantic import BaseModel
 from workflows import Context, Workflow, step
 from workflows.events import Event, StartEvent, StopEvent
@@ -53,7 +52,7 @@ class ExtractionState(BaseModel):
 
 
 class ProcessFileWorkflow(Workflow):
-    """Extract structured data from a document and save it for review."""
+    """Extract findings, methodology, and citations from research papers."""
 
     @step()
     async def start_extraction(
@@ -79,9 +78,7 @@ class ProcessFileWorkflow(Workflow):
 
         # Download file from cloud storage
         try:
-            files = await llama_cloud_client.files.query(
-                filter=Filter(file_ids=[file_id])
-            )
+            files = await llama_cloud_client.files.list(file_ids=[file_id])
             file_metadata = files.items[0]
             file_url = await llama_cloud_client.files.get(file_id=file_id)
 

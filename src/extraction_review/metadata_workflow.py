@@ -16,7 +16,7 @@ class MetadataResponse(StopEvent):
 
 
 class MetadataWorkflow(Workflow):
-    """Provide extraction schema and configuration to the workflow editor."""
+    """Provide research paper extraction schema to the workflow editor."""
 
     @step
     async def get_metadata(

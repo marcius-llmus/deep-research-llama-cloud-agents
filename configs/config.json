@@ -3,21 +3,97 @@
     "json_schema": {
       "type": "object",
       "properties": {
-        "document_type": {
-          "type": "string",
-          "description": "An overarching category for the type of document (e.g. invoice, purchase order, etc.)"
+        "title": {
+          "type": ["string", "null"],
+          "description": "The title of the research paper"
         },
-        "summary": {
-          "type": "string",
-          "description": "A 2-3 sentence summary describing the content of the document"
-        },
-        "key_points": {
+        "authors": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "A list of key points or insights from the document"
+          "description": "List of author names"
+        },
+        "abstract": {
+          "type": ["string", "null"],
+          "description": "The abstract or summary of the paper"
+        },
+        "methodology": {
+          "type": "object",
+          "properties": {
+            "approach": {
+              "type": ["string", "null"],
+              "description": "The overall research approach or design (e.g., qualitative, quantitative, experimental, observational)"
+            },
+            "data_collection": {
+              "type": ["string", "null"],
+              "description": "How data was collected (e.g., surveys, interviews, experiments, datasets used)"
+            },
+            "sample_size": {
+              "type": ["string", "null"],
+              "description": "Number of participants, samples, or data points studied"
+            },
+            "analysis_methods": {
+              "type": ["string", "null"],
+              "description": "Statistical or analytical methods used to analyze the data"
+            }
+          },
+          "required": ["approach", "data_collection", "sample_size", "analysis_methods"],
+          "description": "The research methodology used in the study"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "finding": {
+                "type": "string",
+                "description": "A key finding or result from the research"
+              },
+              "significance": {
+                "type": ["string", "null"],
+                "description": "The statistical significance or importance of this finding"
+              }
+            },
+            "required": ["finding", "significance"]
+          },
+          "description": "Key findings and results from the research"
+        },
+        "conclusions": {
+          "type": ["string", "null"],
+          "description": "The main conclusions drawn from the research"
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "authors": {
+                "type": ["string", "null"],
+                "description": "Authors of the cited work"
+              },
+              "title": {
+                "type": ["string", "null"],
+                "description": "Title of the cited work"
+              },
+              "year": {
+                "type": ["string", "null"],
+                "description": "Publication year"
+              },
+              "source": {
+                "type": ["string", "null"],
+                "description": "Journal, conference, or publication source"
+              }
+            },
+            "required": ["authors", "title", "year", "source"]
+          },
+          "description": "References and citations from the paper's bibliography"
+        },
+        "keywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Keywords or key terms from the paper"
         }
       },
-      "required": ["document_type", "summary", "key_points"]
+      "required": ["title", "authors", "abstract", "methodology", "findings", "conclusions", "citations", "keywords"]
     },
     "settings": {
       "extraction_mode": "PREMIUM",
