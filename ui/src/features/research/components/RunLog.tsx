@@ -85,7 +85,6 @@ function EventRow({ event, defaultExpanded = false }: EventRowProps) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const { type, data, ts } = event;
 
-  // For tool calls, show kwargs; for results, show output
   const renderDetails = () => {
     if (type === "ToolCall") {
       const d = data as ToolCallData;
@@ -129,7 +128,6 @@ function EventRow({ event, defaultExpanded = false }: EventRowProps) {
       );
     }
 
-    // Fallback: show JSON
     return (
       <pre className="text-xs text-gray-700 whitespace-pre-wrap break-words font-mono bg-gray-100 rounded p-2 max-h-48 overflow-auto">
         {JSON.stringify(data, null, 2)}
@@ -198,14 +196,22 @@ export function RunLog({
     return last ? `${last.ts}-${last.type}` : "";
   }, [events]);
 
+  const lastEventType = useMemo(() => {
+    const last = events.length > 0 ? events[events.length - 1] : undefined;
+    return last?.type;
+  }, [events]);
+
   useEffect(() => {
-    if (!autoScroll) return;
     if (!stickToBottom) return;
+
+    const isTerminalEvent =
+      lastEventType === "StopEvent" || lastEventType === "WorkflowCancelledEvent";
+
+    if (!autoScroll && !isTerminalEvent) return;
     const el = containerRef.current;
     if (!el) return;
-    // Imperative, avoids smooth scrolling "catch-up" during fast streams.
     el.scrollTop = el.scrollHeight;
-  }, [autoScroll, stickToBottom, lastEventKey]);
+  }, [autoScroll, stickToBottom, lastEventKey, lastEventType]);
 
   if (events.length === 0) {
     return (
