@@ -26,7 +26,7 @@ export const ToolbarProvider = ({
 }) => {
   const [buttons, setButtons] = React.useState<React.ReactNode[]>([]);
   const [breadcrumbs, setBreadcrumbs] = React.useState<BreadcrumbItem[]>([
-    { label: APP_TITLE, href: "/" },
+    { label: APP_TITLE, href: "/research" },
   ]);
 
   return (

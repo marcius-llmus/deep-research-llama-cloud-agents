@@ -5,7 +5,7 @@ interface ImportMetaEnv {
   readonly VITE_LLAMA_CLOUD_BASE_URL?: string;
 
   // injected from llama_deploy
-  readonly VITE_LLAMA_DEPLOY_BASE_PATH: string;
+  readonly VITE_LLAMA_DEPLOY_DEPLOYMENT_BASE_PATH?: string;
   readonly VITE_LLAMA_DEPLOY_DEPLOYMENT_NAME: string;
   readonly VITE_LLAMA_DEPLOY_PROJECT_ID: string;
 }

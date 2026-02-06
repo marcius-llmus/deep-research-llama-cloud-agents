@@ -1,13 +1,10 @@
-import { ExtractedData } from "llama-cloud-services/beta/agent";
 import {
   ApiClients,
   createWorkflowsClient,
   createWorkflowsConfig,
-  createCloudAgentClient,
   cloudApiClient,
 } from "@llamaindex/ui";
 import { AGENT_NAME } from "./config";
-import type { Metadata } from "./useMetadata";
 
 const platformToken = import.meta.env.VITE_LLAMA_CLOUD_API_KEY;
 const apiBaseUrl = import.meta.env.VITE_LLAMA_CLOUD_BASE_URL;
@@ -35,17 +32,13 @@ export function createBaseWorkflowClient(): ReturnType<
   );
 }
 
-export function createClients(metadata: Metadata): ApiClients {
+export function createApiClients(): ApiClients {
   const workflowsClient = createBaseWorkflowClient();
-  const agentClient = createCloudAgentClient<ExtractedData<any>>({
-    client: cloudApiClient,
-    windowUrl: typeof window !== "undefined" ? window.location.href : undefined,
-    collection: metadata.extracted_data_collection,
-  });
 
+  // Note: For the mocked Deep Research UI, we only need the workflows client.
+  // Agent Data clients will be added later once the research collection metadata is implemented.
   return {
     workflowsClient,
     cloudApiClient,
-    agentDataClient: agentClient,
   } as ApiClients;
 }

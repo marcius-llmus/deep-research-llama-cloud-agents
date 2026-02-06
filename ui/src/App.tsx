@@ -1,6 +1,5 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
-import { Theme } from "@radix-ui/themes";
+import { Navigate, Route, Routes } from "react-router-dom";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -8,32 +7,27 @@ import {
   BreadcrumbSeparator,
 } from "@llamaindex/ui";
 import { Link } from "react-router-dom";
-import { Toaster } from "sonner";
-import { useToolbar, ToolbarProvider } from "@/lib/ToolbarContext";
-import { MetadataProvider } from "@/lib/MetadataProvider";
+import { useToolbar } from "@/lib/ToolbarContext";
+import { AppProviders } from "@/lib/AppProviders";
 
-// Import pages
-import HomePage from "./pages/HomePage";
-import ItemPage from "./pages/ItemPage";
+import ResearchPage from "./pages/ResearchPage";
+import ResearchSessionPage from "./pages/ResearchSessionPage";
 
 export default function App() {
   return (
-    <Theme>
-      <MetadataProvider>
-        <ToolbarProvider>
-          <div className="grid grid-rows-[auto_1fr] h-screen">
-            <Toolbar />
-            <main className="overflow-auto">
-              <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/item/:itemId" element={<ItemPage />} />
-              </Routes>
-            </main>
-          </div>
-          <Toaster />
-        </ToolbarProvider>
-      </MetadataProvider>
-    </Theme>
+    <AppProviders>
+      <div className="grid grid-rows-[auto_1fr] h-screen">
+        <Toolbar />
+        <main className="overflow-auto">
+          <Routes>
+            <Route path="/" element={<Navigate to="/research" replace />} />
+            <Route path="/research" element={<ResearchPage />} />
+            <Route path="/research/:researchId" element={<ResearchSessionPage />} />
+            <Route path="*" element={<Navigate to="/research" replace />} />
+          </Routes>
+        </main>
+      </div>
+    </AppProviders>
   );
 }
 
