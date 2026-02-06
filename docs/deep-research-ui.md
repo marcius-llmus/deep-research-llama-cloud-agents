@@ -116,7 +116,8 @@ Optional (phase 2 enhancements)
 2) **Live Report**
    - Render `report_markdown` with a clean markdown renderer
    - A “Last updated” timestamp
-   - Report updates are reflected live when the event stream indicates the report changed (see **Event contract**).
+   - The report is **authoritative in the agent context** (the in-memory workflow/agent state). The UI renders
+     the newest report by observing FunctionAgent tool results (see **Event contract**).
 
 3) **Sources**
    - List of sources with:
@@ -200,9 +201,9 @@ Purpose: trace tool usage.
 
 UI behavior:
 - Render a tool timeline with expandable inputs/outputs.
-- If the tool is `update_report`, refresh the report panel. Preferred approaches (in order):
-  1. If the `ToolCallResult` includes `new_report_markdown`, update the report immediately.
-  2. Otherwise, re-fetch the session record from Agent Data (eventual consistency).
+- If the tool is `update_report`, refresh the report panel.
+  - The report is always in agent context, so the UI must treat the tool result as the authoritative update.
+  - Requirement: `ToolCallResult[UpdateReportResult]` includes `new_report_markdown`.
 
 #### `AgentInput` / `AgentOutput`
 Purpose: explicit agent input/output markers (useful for separating planning artifacts from execution artifacts).
@@ -215,7 +216,7 @@ Purpose: marks workflow completion and provides the final result payload.
 
 UI behavior:
 - Mark run as completed.
-- Refresh session record from Agent Data and enable exports.
+- Enable exports.
 
 #### `WorkflowCancelledEvent`
 Purpose: marks a cancelled run.
@@ -230,16 +231,18 @@ UI behavior:
 
 Because the system uses **only FunctionAgent events**, the UI must treat the following as authoritative signals that the report changed:
 
-1. A `ToolCallResult` for tool `update_report` that contains `new_report_markdown`.
-2. If the backend persists the session record after report updates, the UI may also periodically refresh the session record from Agent Data when it observes:
-   - `ToolCallResult(update_report)` (even if it does not include the report inline)
-   - `StopEvent`
+1. A `ToolCallResult[UpdateReportResult]` for tool `update_report` that contains `new_report_markdown`.
 
-The UI must **not** depend on separate domain events like `ReportUpdated`.
+The UI must **not** depend on separate domain events.
 
 ## 7) Session record (Agent Data shape)
 
-The UI should be able to render from a single “session record” retrieved from Agent Data.
+The UI should be able to render from a single “session record” retrieved from Agent Data for:
+- dashboard listing
+- resume/reload of a session
+
+However, the **live report** is always authoritative in the **agent context** during an active run and must be
+updated from `ToolCallResult(update_report)`.
 
 Minimum recommended fields:
 
@@ -270,6 +273,10 @@ Minimum recommended fields:
   ]
 }
 ```
+
+Notes:
+- You may persist `report_markdown` to Agent Data for resumability, but the UI should treat it as a snapshot.
+- The most up-to-date report comes from the agent event stream.
 
 ---
 
