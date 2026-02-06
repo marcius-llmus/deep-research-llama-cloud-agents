@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "@llamaindex/ui";
 import { Download, Play } from "lucide-react";
 
 import { useToolbar } from "@/lib/ToolbarContext";
@@ -38,6 +37,26 @@ export default function ResearchSessionPage() {
   const effectiveUpdatedAt = run.effectiveUpdatedAt ?? session?.updated_at;
   const effectiveReport = run.effectiveReport ?? session?.report_markdown;
 
+  const handleExportJSON = useCallback(() => {
+    if (!session) return;
+    downloadJSON(
+      {
+        ...session,
+        status: (effectiveStatus ?? session.status) as ResearchSession["status"],
+        updated_at: effectiveUpdatedAt ?? session.updated_at,
+        report_markdown: effectiveReport ?? session.report_markdown,
+      },
+      `research-${session.research_id}.json`,
+    );
+  }, [session, effectiveStatus, effectiveUpdatedAt, effectiveReport]);
+
+  const handleStartRun = useCallback(() => {
+    setTab("run_log");
+    void run.start();
+  }, [run]);
+
+  const isAwaitingApproval = effectiveStatus === "awaiting_approval";
+
   useEffect(() => {
     if (!session) {
       setBreadcrumbs([
@@ -55,56 +74,31 @@ export default function ResearchSessionPage() {
     ]);
 
     setButtons(() => [
-      <div key="research-session-actions" className="ml-auto flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            if (!session) return;
-            downloadJSON(
-              {
-                ...session,
-                status: (effectiveStatus ?? session.status) as ResearchSession["status"],
-                updated_at: effectiveUpdatedAt ?? session.updated_at,
-                report_markdown: effectiveReport ?? session.report_markdown,
-              },
-              `research-${session.research_id}.json`,
-            );
-          }}
+      <div key="session-actions" className="ml-auto flex items-center gap-2">
+        <button
+          className="inline-flex items-center gap-1.5 px-3 h-9 min-w-0 max-w-full overflow-hidden text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition"
+          onClick={handleExportJSON}
         >
-          <Download className="h-4 w-4 mr-2" />
-          Export JSON
-        </Button>
-        <Button
-          size="sm"
-          onClick={() => {
-            // Mock: in real UI this would send an approval event or start the execute run
-            setTab("run_log");
-            void run.start();
-          }}
+          <Download className="h-4 w-4 shrink-0" />
+          <span className="truncate min-w-0">Export JSON</span>
+        </button>
+        <button
+          className="inline-flex items-center gap-1.5 px-3 h-9 min-w-0 max-w-full overflow-hidden text-sm font-medium rounded-lg bg-gray-900 text-white hover:bg-gray-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          onClick={handleStartRun}
           disabled={run.isRunning}
         >
-          <Play className="h-4 w-4 mr-2" />
-          {effectiveStatus === "awaiting_approval"
-            ? "Approve & Start"
-            : "Start / Resume"}
-        </Button>
+          <Play className="h-4 w-4 shrink-0" />
+          <span className="truncate min-w-0">
+            {isAwaitingApproval ? "Approve & Start" : "Start / Resume"}
+          </span>
+        </button>
       </div>,
     ]);
 
     return () => {
       setButtons(() => []);
     };
-  }, [
-    effectiveReport,
-    effectiveStatus,
-    effectiveUpdatedAt,
-    run.isRunning,
-    session,
-    setBreadcrumbs,
-    setButtons,
-    run,
-  ]);
+  }, [session, run.isRunning, isAwaitingApproval, handleExportJSON, handleStartRun, setBreadcrumbs, setButtons]);
 
   if (!session) {
     return (
@@ -112,12 +106,15 @@ export default function ResearchSessionPage() {
         <div className="max-w-3xl mx-auto rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="text-lg font-semibold">Session not found</div>
           <div className="mt-2 text-sm text-gray-600">
-            The research session you requested doesn’t exist in the mock store.
+            The research session you requested doesn't exist in the mock store.
           </div>
           <div className="mt-4">
-            <Button variant="outline" onClick={() => navigate("/research")}>
-              Back to Research
-            </Button>
+            <button
+              className="inline-flex items-center gap-1.5 px-3 h-9 min-w-0 max-w-full overflow-hidden text-sm font-medium rounded-lg border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition"
+              onClick={() => navigate("/research")}
+            >
+              <span className="truncate min-w-0">Back to Research</span>
+            </button>
           </div>
         </div>
       </div>
@@ -148,9 +145,7 @@ export default function ResearchSessionPage() {
           />
         )}
 
-        {tab === "sources" && (
-          <SourcesTab sources={session.sources} />
-        )}
+        {tab === "sources" && <SourcesTab sources={session.sources} />}
 
         {tab === "files" && (
           <FilesTab
@@ -162,19 +157,23 @@ export default function ResearchSessionPage() {
 
         {tab === "run_log" && (
           <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <h2 className="text-sm font-semibold text-gray-900">Run log</h2>
-            <div className="mt-2 text-xs text-gray-500">
-              Mock stream. This mirrors the real handler event stream contract
-              (AgentStream, ToolCall, ToolCallResult, AgentInput, AgentOutput,
-              StopEvent, WorkflowCancelledEvent).
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="text-sm font-semibold text-gray-900">Run log</h2>
+              <div className="text-xs text-gray-500">
+                {run.events.length} events
+              </div>
             </div>
 
             <RunLog
               events={run.events}
-              emptyHint={`Click “${
-                effectiveStatus === "awaiting_approval" ? "Approve & Start" : "Start / Resume"
-              }” to run a mocked stream.`}
+              emptyHint={`Click "${isAwaitingApproval ? "Approve & Start" : "Start / Resume"}" to run a mocked stream.`}
+              autoScroll={run.isRunning}
             />
+
+            <div className="mt-3 text-xs text-gray-500">
+              Mock stream mirrors the real handler event contract: AgentStream,
+              ToolCall, ToolCallResult, AgentInput, AgentOutput, StopEvent.
+            </div>
           </section>
         )}
       </div>

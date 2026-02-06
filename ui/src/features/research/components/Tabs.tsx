@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export type TabItem<T extends string> = {
   key: T;
@@ -17,15 +17,14 @@ export function TabButton({
 }) {
   return (
     <button
-      className={`px-3 py-2 text-sm rounded-lg border transition ${
+      className={`inline-flex items-center min-w-0 max-w-full overflow-hidden px-3 py-1.5 text-sm font-medium rounded-lg border transition h-9 ${
         active
           ? "bg-gray-900 text-white border-gray-900"
           : "bg-white text-gray-700 border-gray-200 hover:border-gray-300"
       }`}
       onClick={onClick}
     >
-      {label}
+      <span className="truncate min-w-0">{label}</span>
     </button>
   );
 }
-
