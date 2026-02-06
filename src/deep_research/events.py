@@ -1,5 +1,3 @@
-from typing import Any
-
 from workflows.events import Event, StartEvent
 
 from deep_research.schemas import PlannerAgentOutput
@@ -15,12 +13,6 @@ class PlannerTurnEvent(Event):
     """Represents a user message in the planning conversation."""
 
     message: str
-
-
-class PlannerFinalPlanEvent(Event):
-    """Signals the UI that a plan is ready for review."""
-
-    plan: dict[str, Any]
 
 
 class PlannerOutputEvent(Event):
