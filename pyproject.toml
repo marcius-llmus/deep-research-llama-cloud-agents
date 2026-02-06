@@ -1,7 +1,7 @@
 [project]
-name = "extraction-review"
+name = "deep-research"
 version = "0.1.0"
-description = "Extracts data"
+description = "Deep Research planning workflows"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -11,10 +11,13 @@ dependencies = [
     "click>=8.2.1,<8.3.0",
     "httpx>=0.28.1",
     "llama-index-core>=0.14.0",
+    "llama-index-llms-openai>=0.6.6",
     "respx>=0.22.0,<1",
     "llama-cloud>=1.0.0b7",
-    "json-schema-to-pydantic>=0.4.8",
 ]
+
+[project.scripts]
+deep-research = "deep_research.cli:main"
 
 [dependency-groups]
 dev = [
@@ -53,9 +56,8 @@ env_files = [".env"]
 llama_cloud = true
 
 [tool.llamadeploy.workflows]
-process-file = "extraction_review.process_file:workflow"
-metadata = "extraction_review.metadata_workflow:workflow"
+research-metadata = "deep_research.research_metadata_workflow:workflow"
+deep-research-plan = "deep_research.research_plan_workflow:workflow"
 
 [tool.llamadeploy.ui]
 directory = "ui"
-

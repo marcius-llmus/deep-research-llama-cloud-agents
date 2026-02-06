@@ -5,7 +5,7 @@ This document specifies the backend workflow design for a **Deep Research Agent*
 - Workflows are served via `llamactl serve`.
 - Progress is streamed to the UI using workflow events.
 - Configuration is loaded via `ResourceConfig` from `configs/config.json`.
-- Llama Cloud access is injected via `Resource(get_llama_cloud_client)` from `src/extraction_review/clients.py`.
+- Llama Cloud access is injected via `Resource(get_llama_cloud_client)` from `src/deep_research/clients.py`.
 - Persisted records are written to **Agent Data** idempotently (delete/replace by stable identifier).
 
 ---
@@ -41,7 +41,8 @@ This document specifies the backend workflow design for a **Deep Research Agent*
 - `research_collection` (Agent Data collection name)
 - optional `research_settings_schema` (JSON Schema to drive a dynamic settings form)
 
-This mirrors the existing `metadata_workflow.py` pattern.
+This follows the same metadata workflow pattern used throughout the repo: load config via
+`ResourceConfig`, resolve `$ref`s, and return a small, UI-friendly payload.
 
 ---
 
@@ -323,8 +324,8 @@ All new workflows must be registered in `pyproject.toml` under:
 
 ```toml
 [tool.llamadeploy.workflows]
-research-metadata = "src.extraction_review.research_metadata_workflow:workflow"
-deep-research = "src.extraction_review.research_workflow:workflow"
+research-metadata = "deep_research.research_metadata_workflow:workflow"
+deep-research-plan = "deep_research.research_plan_workflow:workflow"
 ```
 
 Names must remain stable because the frontend references them.
