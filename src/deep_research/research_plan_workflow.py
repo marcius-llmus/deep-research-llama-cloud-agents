@@ -24,28 +24,24 @@ class DeepResearchPlanWorkflow(Workflow):
         "You are an expert deep-research planner collaborating with a human.\n\n"
         "Goal: produce a high-quality research plan through HITL iterations.\n\n"
         "You MUST output a valid JSON object that matches the PlannerAgentOutput schema.\n\n"
+        "The generated plan must be ready to be accepted. No meta questions about the topic.\n\n"
+        "Plan editing rules:\n"
+        "- If the user asks for ANY change, you MUST update the plan accordingly.\n"
+        "- Always return the FULL revised plan in the 'plan' field (raw text, not JSON).\n"
+        "- Avoid changing the plan between interactions unless the user explicitly asks.\n\n"
         "Your job: convert the user's request into a compact research plan as questions we will research.\n\n"
-        "Output requirements:\n"
-        "- Do NOT list sources, databases, tools, or institutions.\n"
-        "- Do NOT write a methodology or step-by-step procedure.\n"
-        "- The plan MUST be 3-5 bullet points and EACH bullet must be a QUESTION.\n"
-        "- Keep it short: <= 80 words total for the plan, unless user proposes it to be bigger.\n\n"
-        "Constraints:\n"
-        "- Plan bullets must be ABOUT THE TOPIC (the actual research questions), not meta-questions about\n"
-        "  how to measure/define the topic. Do not use the plan bullets to ask the user to choose a metric,\n"
-        "  year, thresholds, regions, etc.\n"
-        "- If key details are missing, do BOTH of the following:\n"
-        "  (1) In response: ask 1-3 clarifying questions for the user.\n"
-        "  (2) In plan: still propose a best-effort plan using explicit reasonable default assumptions\n"
-        "      (e.g., latest year available; worldwide; GDP per capita PPP; include/exclude microstates),\n"
-        "      and ensure every bullet remains a topic research question.\n\n"
         "Decision policy (HITL):\n"
         "- decision='propose_plan': Present a plan (initial or revised) for user review.\n"
-        "- decision='finalize': Use this when user agrees with the plan.\n"
+        "- decision='finalize': Use this when the user agrees with the plan (e.g., they say 'accept').\n"
         "  This is the TERMINAL step. The workflow will end here.\n"
         "- If details are missing in the query, ask clarifying questions in response, and propose the best plan you can.\n"
-        "- The plan MUST be returned as raw text in plan (not JSON).\n"
     )
+
+    @staticmethod
+    def _build_system_prompt(current_plan: str) -> str:
+        current_plan = (current_plan or "").strip()
+        plan_block = current_plan if current_plan else "(none yet)"
+        return f"{DeepResearchPlanWorkflow._SYSTEM_PROMPT}\n\nCurrent plan:\n{plan_block}\n"
 
     @step
     async def init_session(
@@ -62,6 +58,7 @@ class DeepResearchPlanWorkflow(Workflow):
             state.initial_query = initial_query
             state.research_id = str(uuid.uuid4())
             state.status = "planning"
+            state.plan_text = ""
 
         await ctx.store.set("memory", ChatMemoryBuffer.from_defaults(llm=planner_llm))
 
@@ -76,11 +73,14 @@ class DeepResearchPlanWorkflow(Workflow):
     ) -> PlannerOutputEvent:
         """Run the LLM and parse a structured PlannerAgentOutput."""
 
+        state: ResearchPlanState = await ctx.store.get_state()
+        system_prompt = self._build_system_prompt(state.plan_text)
+
         memory: BaseMemory = await ctx.store.get("memory")
         history = await memory.aget()
 
         messages = [
-            ChatMessage(role="system", content=self._SYSTEM_PROMPT),
+            ChatMessage(role="system", content=system_prompt),
             *history,
             ChatMessage(role="user", content=ev.message),
         ]
@@ -118,8 +118,9 @@ class DeepResearchPlanWorkflow(Workflow):
         if ev.output.decision != "finalize":
             prefix = (
                 f"Current Plan:\n{ev.output.plan}\n\n"
-                f"You can improve the research plan answering these questions:\n{ev.output.response}\n\n"
-                "Type 'accept' to approve, or reply with edits."
+                "-----------------------\n\n"
+                f"\n{ev.output.response}\n\n"
+                "If the actual plan is good enough, type 'accept' to approve, or reply with edits."
             )
             return InputRequiredEvent(prefix=prefix)  # noqa
 
