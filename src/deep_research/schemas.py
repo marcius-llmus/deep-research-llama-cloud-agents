@@ -3,25 +3,20 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
-class ResearchPlan(BaseModel):
-    clarifying_questions: list[str] = Field(default_factory=list)
-    expanded_queries: list[str] = Field(default_factory=list)
-    outline: list[str] = Field(default_factory=list)
-    assumptions: list[str] = Field(default_factory=list)
-
-
 class PlannerAgentOutput(BaseModel):
     """Structured output contract for the planning agent per turn."""
 
-    kind: Literal["question", "plan"]
-    question: str | None = None
-    plan: ResearchPlan | None = None
+    decision: Literal["ask_question", "propose_plan", "finalize"]
+    response: str = Field(description="The message to show to the user (question or plan explanation).")
+    plan: str | None = Field(
+        default=None,
+        description=(
+            "The current research plan as raw text. Required if decision is 'propose_plan' or 'finalize'."
+        ),
+    )
 
 
 class ResearchPlanState(BaseModel):
     initial_query: str | None = None
     research_id: str | None = None
-    plan: ResearchPlan = ResearchPlan()
     status: Literal["planning", "awaiting_approval", "failed"] = "planning"
-    last_question: str | None = None
-

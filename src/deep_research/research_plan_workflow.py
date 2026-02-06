@@ -1,84 +1,154 @@
-import hashlib
-import logging
-from typing import Annotated
+import uuid
+from typing import Annotated, Union
 
 from llama_cloud import AsyncLlamaCloud
-from workflows import Context, Workflow, step
-from llama_index.core.workflow.events import HumanResponseEvent, InputRequiredEvent
-from workflows.resource import Resource, ResourceConfig
+from llama_index.core.agent.utils import generate_structured_response
+from llama_index.core.llms import ChatMessage
+from llama_index.core.memory import BaseMemory, ChatMemoryBuffer
+from llama_index.core.workflow.events import HumanResponseEvent, InputRequiredEvent, StopEvent
 from workflows.events import StartEvent
+from workflows import Context, Workflow, step
+from workflows.resource import Resource, ResourceConfig
+
 from .clients import agent_name, get_llama_cloud_client
 from .config import ResearchConfig
-from .events import (
-    PlannerFinalPlanEvent,
-    PlannerQuestionEvent,
-    PlannerStatusEvent,
-    PlannerTurnEvent,
-    ResearchPlanResponse,
-)
+from .events import PlannerFinalPlanEvent, PlannerTurnEvent, PlannerOutputEvent
 from llama_index.llms.openai import OpenAI
 
 from .llm import get_planner_llm_resource
-from .schemas import PlannerAgentOutput, ResearchPlan, ResearchPlanState
+from .schemas import PlannerAgentOutput, ResearchPlanState
 
-logger = logging.getLogger(__name__)
 
 
 class DeepResearchPlanWorkflow(Workflow):
-    """Deep Research planning workflow (HITL conversation + persistence).
+    _SYSTEM_PROMPT = (
+        "You are an expert deep-research planner collaborating with a human.\n\n"
+        "Goal: produce a high-quality research plan through HITL iterations.\n\n"
+        "You MUST output a valid JSON object that matches the PlannerAgentOutput schema.\n\n"
+        "Process:\n"
+        "- Ask a clarifying question if needed (exactly ONE question).\n"
+        "- Otherwise, propose a research plan and ask if it looks good or if the user wants to add/change anything.\n"
+        "- If the user approves explicitly, finalize immediately.\n\n"
+        "Hard rules:\n"
+        "- decision='ask_question' => response is ONLY the question. plan must be null.\n"
+        "- decision='propose_plan' => include a plan and end response with an approval question.\n"
+        "- decision='finalize' => ONLY after explicit approval (e.g. 'yes', 'approved', 'looks good').\n"
+        "- The plan MUST be returned as raw text in plan (not JSON).\n"
+        "- Keep the plan concise but specific: questions to clarify, expanded queries, outline, assumptions.\n"
+    )
 
-    - config loaded via ResourceConfig
-    - cloud client injected via Resource(get_llama_cloud_client)
-    - idempotent Agent Data storage
-
-    NOTE: The FunctionAgent integration is implemented as a pure callable
-    inside `_run_planner_agent()`. In your target app, replace this stub with
-    your `AgentFactoryService.build_agent(...).run(...)` wiring.
-    """
-
-    async def _run_planner_agent(
+    @step
+    async def init_session(
         self,
-        *,
-        llm: OpenAI,
-        state: ResearchPlanState,
-        user_message: str,
-    ) -> PlannerAgentOutput:
-        """Run the planning agent for a single turn.
+        ctx: Context[ResearchPlanState],
+        ev: StartEvent,
+        planner_llm: Annotated[OpenAI, Resource(get_planner_llm_resource)],
+    ) -> PlannerTurnEvent:
+        """Initialize run state and memory buffer once, then convert into a turn."""
 
-        This workflow is the orchestration shell. The "agent" here is intentionally
-        minimal and designed to be replaced by your real FunctionAgent.
+        initial_query = ev.get("initial_query")
+        if not isinstance(initial_query, str) or not initial_query.strip():
+            raise ValueError("start_event.initial_query must be a non-empty string")
 
-        The key thing we want to demonstrate is how an LLM client is injected as a
-        workflow Resource so we can iterate on planning logic without changing
-        step orchestration.
-        """
+        async with ctx.store.edit_state() as state:
+            state.initial_query = initial_query
+            state.research_id = str(uuid.uuid4())
+            state.status = "planning"
 
-        if not state.plan.outline:
-            expanded_query = await llm.apredict(
-                "Rewrite this user query into a single, expanded search query.\n"
-                "User query: {initial_query}",
-                initial_query=state.initial_query or user_message,
-            )
-            plan = ResearchPlan(
-                clarifying_questions=[],
-                expanded_queries=[expanded_query],
-                outline=["Overview", "Key trade-offs", "Recommendations", "Sources"],
-                assumptions=[],
-            )
-            return PlannerAgentOutput(kind="plan", plan=plan)
+        await ctx.store.set("memory", ChatMemoryBuffer.from_defaults(llm=planner_llm))
 
-        follow_up = await llm.apredict(
-            "Ask one concise clarifying question to improve this research plan.",
-            user_message=user_message,
+        return PlannerTurnEvent(message=initial_query)
+
+    @step
+    async def run_planner_llm(
+        self,
+        ctx: Context[ResearchPlanState],
+        ev: PlannerTurnEvent,
+        planner_llm: Annotated[OpenAI, Resource(get_planner_llm_resource)],
+    ) -> PlannerOutputEvent:
+        """Run the LLM and parse a structured PlannerAgentOutput."""
+
+        memory: BaseMemory = await ctx.store.get("memory")
+        history = await memory.aget()
+
+        messages = [
+            ChatMessage(role="system", content=self._SYSTEM_PROMPT),
+            *history,
+            ChatMessage(role="user", content=ev.message),
+        ]
+
+        output = await generate_structured_response(
+            messages=messages, llm=planner_llm, output_cls=PlannerAgentOutput
         )
-        return PlannerAgentOutput(kind="question", question=follow_up)
+        return PlannerOutputEvent(output=output, user_message=ev.message)
 
-    async def _persist_session(
+    @step
+    async def apply_plan_update(
         self,
+        ctx: Context[ResearchPlanState],
+        ev: PlannerOutputEvent,
+    ) -> PlannerOutputEvent:
+        """Apply any plan updates into workflow state and stream plan to UI."""
+
+        memory: BaseMemory = await ctx.store.get("memory")
+        await memory.aput(ChatMessage(role="user", content=ev.user_message))
+        await memory.aput(ChatMessage(role="assistant", content=ev.output.response))
+
+        ctx.write_event_to_stream(
+            PlannerFinalPlanEvent(plan={"text": ev.output.plan})
+        )
+
+        return ev
+
+    @step
+    async def decide_next(
+        self,
+        ctx: Context[ResearchPlanState],
+        ev: PlannerOutputEvent,
+        llama_cloud_client: Annotated[AsyncLlamaCloud, Resource(get_llama_cloud_client)],
+        research_config: Annotated[
+            ResearchConfig,
+            ResourceConfig(
+                config_file="configs/config.json",
+                path_selector="research",
+                label="Research Config",
+                description="Deep research collection + settings",
+            ),
+        ],
+    ) -> Union[InputRequiredEvent, StopEvent]:
+        """Return HITL request or finalize/persist."""
+
+        # finalize immediately when the model says it's finalized (explicit approval detected)
+        if ev.output.decision != "finalize":
+            return InputRequiredEvent(prefix=ev.output.response)
+
+        async with ctx.store.edit_state() as new_state:
+            new_state.status = "awaiting_approval"
+
+        final_state = await ctx.store.get_state()
+        item_id = await self._persist_session(
+            llama_cloud_client=llama_cloud_client,
+            research_config=research_config,
+            state=final_state,
+            plan_text=ev.output.plan,
+        )
+
+        return StopEvent(
+            result={
+                "research_id": final_state.research_id,
+                "status": final_state.status,
+                "agent_data_id": item_id,
+                "plan": ev.output.plan,
+            }
+        )
+
+    @staticmethod
+    async def _persist_session(
         *,
         llama_cloud_client: AsyncLlamaCloud,
         research_config: ResearchConfig,
         state: ResearchPlanState,
+        plan_text: str | None,
     ) -> str:
         """Persist the session record idempotently and return agent_data item id."""
 
@@ -89,10 +159,9 @@ class DeepResearchPlanWorkflow(Workflow):
             "research_id": state.research_id,
             "status": state.status,
             "initial_query": state.initial_query,
-            "plan": state.plan.model_dump(),
+            "plan": plan_text,
         }
 
-        # delete/replace by stable id
         await llama_cloud_client.beta.agent_data.delete_by_query(
             deployment_name=agent_name or "_public",
             collection=research_config.collections.research_collection,
@@ -106,122 +175,11 @@ class DeepResearchPlanWorkflow(Workflow):
         return item.id
 
     @step
-    async def process_turn(
-        self,
-        ctx: Context[ResearchPlanState],
-        ev: StartEvent | PlannerTurnEvent,
-        llama_cloud_client: Annotated[AsyncLlamaCloud, Resource(get_llama_cloud_client)],
-        planner_llm: Annotated[OpenAI, Resource(get_planner_llm_resource)],
-        research_config: Annotated[
-            ResearchConfig,
-            ResourceConfig(
-                config_file="configs/config.json",
-                path_selector="research",
-                label="Research Config",
-                description="Deep research collection + settings",
-            ),
-        ],
-    ) -> ResearchPlanResponse | PlannerQuestionEvent:
-        """Process a user turn and either ask a follow-up or finish with a plan."""
-
-        if isinstance(ev, StartEvent):
-            # Handle both PlanStartEvent and generic StartEvent (with data payload)
-            user_message = getattr(ev, "initial_query", None) or ev.get("initial_query")
-            if not user_message:
-                raise ValueError("StartEvent received but missing 'initial_query'")
-
-            async with ctx.store.edit_state() as state:
-                state.initial_query = user_message
-                # stable id - keep simple for template; real impl likely uses UUID.
-                state.research_id = (
-                    state.research_id
-                    or f"research-{hashlib.sha256(user_message.encode('utf-8')).hexdigest()[:10]}"
-                )
-                state.status = "planning"
-        else:
-            user_message = ev.message
-
-        ctx.write_event_to_stream(
-            PlannerStatusEvent(level="info", message="Thinking")
-        )
-
-        try:
-            state = await ctx.store.get_state()
-            output = await self._run_planner_agent(
-                llm=planner_llm,
-                state=state,
-                user_message=user_message,
-            )
-        except Exception as e:
-            logger.error("Planning agent failed", exc_info=True)
-            ctx.write_event_to_stream(
-                PlannerStatusEvent(level="error", message=f"Planning failed: {e}")
-            )
-            raise
-
-        if output.kind == "question":
-            question = output.question or "Can you clarify your goal?"
-            async with ctx.store.edit_state() as state:
-                state.last_question = question
-            ctx.write_event_to_stream(PlannerQuestionEvent(question=question))
-            return PlannerQuestionEvent(question=question)
-
-        if output.plan is None:
-            raise ValueError("Planner returned kind='plan' but no plan payload")
-
-        async with ctx.store.edit_state() as state:
-            state.plan = output.plan
-            state.status = "awaiting_approval"
-
-        ctx.write_event_to_stream(
-            PlannerFinalPlanEvent(
-                plan=(await ctx.store.get_state()).plan.model_dump()
-            )
-        )
-
-        try:
-            item_id = await self._persist_session(
-                llama_cloud_client=llama_cloud_client,
-                research_config=research_config,
-                state=await ctx.store.get_state(),
-            )
-        except Exception as e:
-            logger.error("Persisting plan failed", exc_info=True)
-            ctx.write_event_to_stream(
-                PlannerStatusEvent(
-                    level="error", message=f"Failed to save plan snapshot: {e}"
-                )
-            )
-            raise
-        ctx.write_event_to_stream(
-            PlannerStatusEvent(
-                level="info",
-                message=f"Plan saved (agent_data_id={item_id}). Awaiting approval.",
-            )
-        )
-
-        final_state = await ctx.store.get_state()
-        if final_state.research_id is None:
-            raise ValueError("research_id missing")
-
-        return ResearchPlanResponse(
-            research_id=final_state.research_id,
-            status="awaiting_approval",
-            plan=final_state.plan.model_dump(),
-            agent_data_id=item_id,
-        )
-
-    @step
-    async def ask_question(
-        self, ctx: Context[ResearchPlanState], ev: PlannerQuestionEvent
+    async def on_human_response(
+        self, _: Context[ResearchPlanState], ev: HumanResponseEvent
     ) -> PlannerTurnEvent:
-        # This uses the built-in HITL event types expected by the workflow server.
-        response_event: HumanResponseEvent = await ctx.wait_for_event(
-            HumanResponseEvent,
-            waiter_id=ev.question,
-            waiter_event=InputRequiredEvent(prefix=ev.question),
-        )
-        return PlannerTurnEvent(message=response_event.response)
+        """Convert HumanResponseEvent into the internal PlannerTurnEvent."""
+        return PlannerTurnEvent(message=ev.response)
 
 
 workflow = DeepResearchPlanWorkflow(timeout=None)
