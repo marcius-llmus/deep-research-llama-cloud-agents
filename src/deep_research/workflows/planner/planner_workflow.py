@@ -15,7 +15,7 @@ from deep_research.workflows.planner.events import PlannerTurnEvent, PlannerOutp
 from llama_index.llms.openai import OpenAI
 
 from deep_research.llm import get_planner_llm_resource
-from deep_research.workflows.planner.schemas import PlannerAgentOutput, ResearchPlanState
+from deep_research.workflows.planner.models import PlannerAgentOutput, ResearchPlanState
 
 
 

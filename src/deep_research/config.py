@@ -24,6 +24,7 @@ class ResearchSettings(BaseModel):
 
     max_report_update_size: int = 800
     max_search_results_per_query: int = 5
+    min_sources: int = 2
     max_sources: int = 20
     timeout_seconds: int = 600
 
