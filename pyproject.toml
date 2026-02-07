@@ -58,6 +58,7 @@ llama_cloud = true
 [tool.llamadeploy.workflows]
 research-metadata = "deep_research.research_metadata_workflow:workflow"
 deep-research-plan = "deep_research.research_plan_workflow:workflow"
+function-agent = "deep_research.function_agent_workflow:workflow"
 
 [tool.llamadeploy.ui]
 directory = "ui"
