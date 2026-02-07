@@ -1,6 +1,7 @@
+from typing import Any, Dict
 from workflows.events import Event, StartEvent
 
-from deep_research.schemas import PlannerAgentOutput
+from deep_research.workflows.planner.schemas import PlannerAgentOutput
 
 
 class PlanStartEvent(StartEvent):

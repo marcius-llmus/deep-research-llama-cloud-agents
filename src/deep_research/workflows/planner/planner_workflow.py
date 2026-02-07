@@ -9,13 +9,13 @@ from llama_index.core.workflow.events import HumanResponseEvent, InputRequiredEv
 from workflows import Context, Workflow, step
 from workflows.resource import Resource, ResourceConfig
 
-from .clients import agent_name, get_llama_cloud_client
-from .config import ResearchConfig
-from .events import PlannerTurnEvent, PlannerOutputEvent, PlanStartEvent
+from deep_research.clients import agent_name, get_llama_cloud_client
+from deep_research.config import ResearchConfig
+from deep_research.workflows.planner.events import PlannerTurnEvent, PlannerOutputEvent, PlanStartEvent
 from llama_index.llms.openai import OpenAI
 
-from .llm import get_planner_llm_resource
-from .schemas import PlannerAgentOutput, ResearchPlanState
+from deep_research.llm import get_planner_llm_resource
+from deep_research.workflows.planner.schemas import PlannerAgentOutput, ResearchPlanState
 
 
 

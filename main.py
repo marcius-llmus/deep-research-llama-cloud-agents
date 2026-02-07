@@ -1,7 +1,7 @@
 import asyncio
 
-from deep_research.events import PlanStartEvent
-from deep_research.research_plan_workflow import DeepResearchPlanWorkflow
+from deep_research.workflows.planner.events import PlanStartEvent
+from deep_research.workflows.planner.planner_workflow import DeepResearchPlanWorkflow
 from llama_index.core.workflow.events import HumanResponseEvent, InputRequiredEvent
 
 
