@@ -17,10 +17,10 @@ llm_config = research_config.get("llm", {})
 
 # Initialize LLM
 llm = OpenAI(
-    model=llm_config.get("model", "gpt-4o"),
+    model="gpt-4.1-mini",
     temperature=llm_config.get("temperature", 0.1),
     # reasoning_effort is only supported by some models/versions
-    reasoning_effort=llm_config.get("reasoning_effort", "low"),
+    #reasoning_effort=llm_config.get("reasoning_effort", "low"),
 )
 
 # Initialize Tools

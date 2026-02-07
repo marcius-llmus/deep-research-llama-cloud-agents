@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Annotated
 
 from llama_index.core.workflow import Context

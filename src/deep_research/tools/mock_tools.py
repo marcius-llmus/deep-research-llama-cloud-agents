@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import time
 from typing import Annotated
 
@@ -51,4 +49,3 @@ class MockTools(BaseToolSpec):
         """Echo input back."""
 
         return text
-
