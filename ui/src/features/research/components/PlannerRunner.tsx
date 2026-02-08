@@ -2,8 +2,7 @@ import { useWorkflow, useHandler, WorkflowEvent } from "@llamaindex/ui";
 import { useEffect, useRef, useState } from "react";
 import { WORKFLOWS } from "@/lib/workflows.ts";
 import { Send } from "lucide-react";
-import { PlanReviewer } from "./PlanReviewer";
-import { parsePlannerFeedbackRequestEvent, splitBackendPayload } from "../utils";
+import { parsePlannerFeedbackRequestEvent } from "../utils";
 
 interface Message {
   role: "user" | "planner";
@@ -23,11 +22,10 @@ export function PlannerRunner({
   const [messages, setMessages] = useState<Message[]>([
     { role: "user", content: initialQuery },
   ]);
-  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("Starting planner...");
   const [inputValue, setInputValue] = useState("");
   const [awaitingHuman, setAwaitingHuman] = useState(false);
-  
+
   const startedRef = useRef(false);
 
   useEffect(() => {
@@ -42,7 +40,6 @@ export function PlannerRunner({
         setHandlerId(h.handler_id);
         setStatusText("Planner is thinking...");
       } catch (e) {
-        console.error("Failed to start planner workflow:", e);
         const message = e instanceof Error ? e.message : String(e);
         setStatusText(`Error starting planner: ${message}`);
       }
@@ -57,40 +54,30 @@ export function PlannerRunner({
     const sub = handler.subscribeToEvents({
       onData: (event: WorkflowEvent) => {
         const rawText = parsePlannerFeedbackRequestEvent(event);
-        
+
         if (rawText) {
-          // Parse the backend blob into clean plan vs commentary
-          const { plan, message } = splitBackendPayload(rawText);
-          
-          setMessages((prev) => [...prev, { role: "planner", content: message }]);
-          
-          if (plan) {
-            setPendingPlan(plan);
-          }
-          
+          setMessages((prev) => [...prev, { role: "planner", content: rawText }]);
+
           setAwaitingHuman(true);
           setStatusText("Waiting for your response...");
           return;
         }
 
-        const eventType = event.type;
-        const isStop = eventType.endsWith("StopEvent");
+        if (!event.type.endsWith("StopEvent")) return;
 
-        if (isStop) {
-          const data = event.data as any;
-          const result = data?._data?.result;
-          if (result?.plan) {
-            setAwaitingHuman(false);
-            setPendingPlan(null);
-            setStatusText("Planning complete.");
-            onComplete?.(result.plan);
-          }
-        }
+        const data = event.data as { result?: unknown };
+        const result = data.result as { plan?: string } | undefined;
+
+        if (!result?.plan) return;
+
+        setAwaitingHuman(false);
+        setStatusText("Planning complete.");
+        onComplete?.(result.plan);
       },
       onError: (err) => {
         console.error("Workflow stream error:", err);
         setStatusText("Stream error occurred.");
-      }
+      },
     });
 
     return () => sub.unsubscribe();
@@ -98,23 +85,21 @@ export function PlannerRunner({
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
-    submitResponse(inputValue);
-  };
-
-  const handleReviewResponse = (response: string) => {
-    setInputValue(response);
-    submitResponse(response);
+    await submitResponse(inputValue);
   };
 
   const submitResponse = async (response: string) => {
     setMessages((prev) => [...prev, { role: "user", content: response }]);
     setAwaitingHuman(false);
-    setPendingPlan(null);
     setStatusText("Planner is thinking...");
     setInputValue(""); // Clear input just in case
 
     try {
-      await handler?.sendEvent({
+      if (!handler) {
+        throw new Error("Planner handler not ready (missing handler instance). Try again in a moment.");
+      }
+
+      await handler.sendEvent({
         type: "HumanResponseEvent",
         data: { response },
         timestamp: new Date().toISOString(),
@@ -125,25 +110,26 @@ export function PlannerRunner({
     }
   };
 
-  const showReviewer = awaitingHuman && pendingPlan !== null;
-
   return (
-    <div className="flex flex-col h-[500px] border border-gray-200 rounded-lg bg-white shadow-sm">
+    <div className="flex flex-col h-[700px] border border-gray-200 rounded-lg bg-white shadow-sm">
       {/* Header */}
       <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
         <h3 className="font-semibold text-gray-700">Planner Workflow (Real)</h3>
         <span className="text-xs text-gray-500">{handlerId}</span>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m, i) => {
           if (m.role === "planner") {
             return (
               <div key={i} className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-purple-600">Planner</span>
-                <div className="bg-purple-50 p-3 rounded-lg text-sm whitespace-pre-wrap shadow-sm border border-purple-100">
-                  {m.content}
-                </div>
+                
+                {m.content && (
+                  <div className="bg-purple-50 p-3 rounded-lg text-sm whitespace-pre-wrap shadow-sm border border-purple-100">
+                    {m.content}
+                  </div>
+                )}
               </div>
             );
           }
@@ -168,33 +154,27 @@ export function PlannerRunner({
         <div ref={(el) => el?.scrollIntoView({ behavior: "smooth" })} />
       </div>
 
-      {/* Bottom Area: Reviewer OR Chat Input */}
-      {showReviewer ? (
-        <div className="border-t border-gray-100 bg-gray-50/50">
-          <PlanReviewer planText={pendingPlan!} onResponse={handleReviewResponse} />
+      {/* Bottom Area: Chat Input */}
+      <div className="p-4 border-t border-gray-100 bg-gray-50">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+            placeholder={awaitingHuman ? "Type your response..." : "Waiting for planner..."}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            disabled={!awaitingHuman}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!awaitingHuman || !inputValue.trim()}
+            className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Send className="w-4 h-4" />
+          </button>
         </div>
-      ) : (
-        <div className="p-4 border-t border-gray-100 bg-gray-50">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
-              placeholder={awaitingHuman ? "Type your response..." : "Waiting for planner..."}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSend()}
-              disabled={!awaitingHuman}
-            />
-            <button
-              onClick={handleSend}
-              disabled={!awaitingHuman || !inputValue.trim()}
-              className="bg-blue-600 text-white p-2 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              <Send className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
