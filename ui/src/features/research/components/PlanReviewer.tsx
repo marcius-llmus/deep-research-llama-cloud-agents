@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Check, X, Sparkles, Send } from "lucide-react";
-import { cn } from "../../../lib/utils";
+import { cn } from "@/lib/utils.ts";
 
 interface Step {
   id: number;
@@ -176,7 +176,7 @@ export function PlanReviewer({ planText, onResponse }: PlanReviewerProps) {
     let currentPreamble = "";
     let foundSteps = false;
 
-    lines.forEach((line, index) => {
+    lines.forEach((line) => {
       const trimmed = line.trim();
       // Match numbered list items (e.g., "1. Step description")
       const match = trimmed.match(/^(\d+)\.\s+(.*)/);

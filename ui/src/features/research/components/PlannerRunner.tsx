@@ -1,9 +1,9 @@
 import { useWorkflow, useHandler, WorkflowEvent } from "@llamaindex/ui";
 import { useEffect, useRef, useState } from "react";
-import { WORKFLOWS } from "../../../lib/workflows";
+import { WORKFLOWS } from "@/lib/workflows.ts";
 import { Send } from "lucide-react";
 import { PlanReviewer } from "./PlanReviewer";
-import { parsePlannerFeedbackRequestEvent } from "../utils";
+import { parsePlannerFeedbackRequestEvent, splitBackendPayload } from "../utils";
 
 interface Message {
   role: "user" | "planner";
@@ -23,6 +23,7 @@ export function PlannerRunner({
   const [messages, setMessages] = useState<Message[]>([
     { role: "user", content: initialQuery },
   ]);
+  const [pendingPlan, setPendingPlan] = useState<string | null>(null);
   const [statusText, setStatusText] = useState("Starting planner...");
   const [inputValue, setInputValue] = useState("");
   const [awaitingHuman, setAwaitingHuman] = useState(false);
@@ -55,10 +56,18 @@ export function PlannerRunner({
 
     const sub = handler.subscribeToEvents({
       onData: (event: WorkflowEvent) => {
-        console.log("PlannerRunner event:", event);
-        const text = parsePlannerFeedbackRequestEvent(event);
-        if (text) {
-          setMessages((prev) => [...prev, { role: "planner", content: text }]);
+        const rawText = parsePlannerFeedbackRequestEvent(event);
+        
+        if (rawText) {
+          // Parse the backend blob into clean plan vs commentary
+          const { plan, message } = splitBackendPayload(rawText);
+          
+          setMessages((prev) => [...prev, { role: "planner", content: message }]);
+          
+          if (plan) {
+            setPendingPlan(plan);
+          }
+          
           setAwaitingHuman(true);
           setStatusText("Waiting for your response...");
           return;
@@ -72,6 +81,7 @@ export function PlannerRunner({
           const result = data?._data?.result;
           if (result?.plan) {
             setAwaitingHuman(false);
+            setPendingPlan(null);
             setStatusText("Planning complete.");
             onComplete?.(result.plan);
           }
@@ -99,22 +109,23 @@ export function PlannerRunner({
   const submitResponse = async (response: string) => {
     setMessages((prev) => [...prev, { role: "user", content: response }]);
     setAwaitingHuman(false);
+    setPendingPlan(null);
     setStatusText("Planner is thinking...");
     setInputValue(""); // Clear input just in case
 
     try {
       await handler?.sendEvent({
-        name: "HumanResponseEvent",
-        response: response,
-      });
+        type: "HumanResponseEvent",
+        data: { response },
+        timestamp: new Date().toISOString(),
+      } as any);
     } catch (e) {
       console.error("Failed to send response:", e);
       setStatusText("Error sending response.");
     }
   };
 
-  const lastMessage = messages[messages.length - 1];
-  const showReviewer = awaitingHuman && lastMessage?.role === "planner";
+  const showReviewer = awaitingHuman && pendingPlan !== null;
 
   return (
     <div className="flex flex-col h-[500px] border border-gray-200 rounded-lg bg-white shadow-sm">
@@ -126,10 +137,6 @@ export function PlannerRunner({
       
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((m, i) => {
-          if (showReviewer && i === messages.length - 1) {
-             return <PlanReviewer key={i} planText={m.content} onResponse={handleReviewResponse} />;
-          }
-
           if (m.role === "planner") {
             return (
               <div key={i} className="flex flex-col gap-1">
@@ -161,8 +168,12 @@ export function PlannerRunner({
         <div ref={(el) => el?.scrollIntoView({ behavior: "smooth" })} />
       </div>
 
-      {/* Input Area */}
-      {!showReviewer && (
+      {/* Bottom Area: Reviewer OR Chat Input */}
+      {showReviewer ? (
+        <div className="border-t border-gray-100 bg-gray-50/50">
+          <PlanReviewer planText={pendingPlan!} onResponse={handleReviewResponse} />
+        </div>
+      ) : (
         <div className="p-4 border-t border-gray-100 bg-gray-50">
           <div className="flex gap-2">
             <input
