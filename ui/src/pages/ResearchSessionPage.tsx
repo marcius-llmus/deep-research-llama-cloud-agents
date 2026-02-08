@@ -64,7 +64,7 @@ export default function ResearchSessionPage() {
   };
 
   useEffect(() => {
-    if (!orchestratorHandler) return;
+    if (!orchestratorHandler || !orchestratorHandlerId) return;
     
     const sub = orchestratorHandler.subscribeToEvents({
       onData: (event) => {

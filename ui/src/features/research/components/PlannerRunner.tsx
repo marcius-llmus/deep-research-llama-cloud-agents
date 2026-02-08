@@ -54,7 +54,7 @@ export function PlannerRunner({
   }, [initialQuery, workflow]);
 
   useEffect(() => {
-    if (!handler) return;
+    if (!handler || !handlerId) return;
 
     const sub = handler.subscribeToEvents({
       onData: (event: WorkflowEvent) => {
