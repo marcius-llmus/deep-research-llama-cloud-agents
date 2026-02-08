@@ -5,6 +5,7 @@ from llama_index.core.workflow import Context
 from llama_index.llms.openai import OpenAI
 
 from deep_research.config import ResearchConfig
+from deep_research.utils import load_config_from_json
 
 from deep_research.workflows.research.state_keys import (
     OrchestratorStateKey,
@@ -18,7 +19,13 @@ from deep_research.workflows.research.searcher.agent import workflow as searcher
 from deep_research.workflows.research.writer.agent import workflow as writer_agent
 from deep_research.workflows.research.reviewer.agent import workflow as reviewer_agent
 
-cfg = ResearchConfig()
+cfg = load_config_from_json(
+    model=ResearchConfig,
+    config_file="configs/config.json",
+    path_selector="research",
+    label="Research Config",
+    description="Deep research collection + settings",
+)
 llm_cfg = cfg.llm
 
 llm = OpenAI(

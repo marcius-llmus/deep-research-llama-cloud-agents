@@ -1,8 +1,15 @@
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 from deep_research.config import ResearchConfig
+from deep_research.utils import load_config_from_json
 
-cfg = ResearchConfig()
+cfg = load_config_from_json(
+    model=ResearchConfig,
+    config_file="configs/config.json",
+    path_selector="research",
+    label="Research Config",
+    description="Deep research collection + settings",
+)
 llm_cfg = cfg.llm
 
 llm = OpenAI(
@@ -10,6 +17,8 @@ llm = OpenAI(
     temperature=llm_cfg.temperature,
     reasoning_effort=llm_cfg.reasoning_effort,
 )
+
+tools = []
 
 system_prompt = (
     "You are a critical reviewer.\n"
@@ -22,5 +31,5 @@ workflow = FunctionAgent(
     description="An agent capable of reviewing reports",
     system_prompt=system_prompt,
     llm=llm,
-    tools=[],
+    tools=tools,
 )

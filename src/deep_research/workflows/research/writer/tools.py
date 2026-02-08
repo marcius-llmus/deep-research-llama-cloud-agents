@@ -101,9 +101,3 @@ class WriterTools(BaseToolSpec):
             ctx=ctx,
         )
         return str(result.response)
-
-
-def get_writer_tools(*, config: ResearchConfig | None = None) -> list:
-    cfg = config or ResearchConfig()
-    tools_spec = WriterTools(config=cfg)
-    return tools_spec.to_tool_list()

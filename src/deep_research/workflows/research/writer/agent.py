@@ -1,9 +1,16 @@
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.llms.openai import OpenAI
 from deep_research.config import ResearchConfig
-from deep_research.workflows.research.writer.tools import get_writer_tools
+from deep_research.utils import load_config_from_json
+from deep_research.workflows.research.writer.tools import WriterTools
 
-cfg = ResearchConfig()
+cfg = load_config_from_json(
+    model=ResearchConfig,
+    config_file="configs/config.json",
+    path_selector="research",
+    label="Research Config",
+    description="Deep research collection + settings",
+)
 llm_cfg = cfg.llm
 
 llm = OpenAI(
@@ -11,6 +18,9 @@ llm = OpenAI(
     temperature=llm_cfg.temperature,
     reasoning_effort=llm_cfg.reasoning_effort,
 )
+
+tools_spec = WriterTools(config=cfg)
+tools = tools_spec.to_tool_list()
 
 system_prompt = (
     "You are an expert technical writer.\n"
@@ -25,5 +35,5 @@ workflow = FunctionAgent(
     description="An agent capable of writing reports",
     system_prompt=system_prompt,
     llm=llm,
-    tools=get_writer_tools(config=cfg),
+    tools=tools,
 )
