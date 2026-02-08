@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, ArrowRight } from "lucide-react";
+import { Plus } from "lucide-react";
 
 import { useToolbar } from "@/lib/ToolbarContext";
 import { APP_TITLE, SESSIONS_TITLE } from "@/lib/config";

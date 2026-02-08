@@ -1,11 +1,3 @@
-import type { ReactNode } from "react";
-
-export type TabItem<T extends string> = {
-  key: T;
-  label: string;
-  content: ReactNode;
-};
-
 export function TabButton({
   label,
   active,

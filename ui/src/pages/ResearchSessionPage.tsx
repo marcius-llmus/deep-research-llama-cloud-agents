@@ -12,7 +12,11 @@ import {
   type SessionTabKey,
 } from "@/features/research/components/SessionHeader";
 import { ReportTab } from "@/features/research/components/tabs/ReportTab";
+import { OverviewTab } from "@/features/research/components/tabs/OverviewTab";
+import { SourcesTab } from "@/features/research/components/tabs/SourcesTab";
+import { FilesTab } from "@/features/research/components/tabs/FilesTab";
 import { PlannerRunner } from "@/features/research/components/PlannerRunner";
+import type { ResearchArtifact, ResearchSource } from "@/features/research/types";
 import type { FunctionAgentEvent } from "@/features/research/events";
 import { WORKFLOWS } from "@/lib/workflows";
 
@@ -27,6 +31,12 @@ export default function ResearchSessionPage() {
   const [plan, setPlan] = useState<string | null>(null);
   const [orchestratorHandlerId, setOrchestratorHandlerId] = useState<string | null>(null);
   const [orchestratorEvents, setOrchestratorEvents] = useState<FunctionAgentEvent[]>([]);
+  const [reportMarkdown, setReportMarkdown] = useState<string>("");
+
+  // TODO: wire these once orchestrator emits structured source/artifact data.
+  const [sources] = useState<ResearchSource[]>([]);
+  const [artifacts] = useState<ResearchArtifact[]>([]);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 
   const [tab, setTab] = useState<SessionTabKey>("overview");
   
@@ -82,6 +92,15 @@ export default function ResearchSessionPage() {
           ts: new Date().toISOString(),
         };
         setOrchestratorEvents(prev => [...prev, mappedEvent]);
+
+        // Keep the report tab updated as soon as the writer tool reports a new markdown.
+        if (type === "ToolCallResult") {
+          const data = mappedEvent.data as any;
+          if (typeof data?.new_report_markdown === "string") {
+            setReportMarkdown(data.new_report_markdown);
+          }
+        }
+
         if (eventName === "StopEvent" || eventName.endsWith("StopEvent")) {
             setStatus("completed");
         }
@@ -173,11 +192,47 @@ export default function ResearchSessionPage() {
           setTab={setTab}
         />
 
-        {/* Placeholder Tabs for now - logic needs to be connected to real state */}
-        {tab === "overview" && <div className="p-4 bg-white rounded-lg border">Plan: <pre className="whitespace-pre-wrap text-sm">{plan}</pre></div>}
-        {tab === "report" && <ReportTab reportMarkdown="# Report\n\n(Generating...)" researchId={researchId || "temp"} />}
+        {tab === "overview" && (
+          <OverviewTab
+            session={{
+              research_id: researchId || "temp",
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              status: status === "completed" ? "completed" : "running",
+              initial_query: query,
+              plan: {
+                clarifying_questions: [],
+                expanded_queries: [],
+                outline: plan ? [plan] : [],
+              },
+              report_markdown: reportMarkdown,
+              sources: [],
+              artifacts: [],
+            }}
+            status={status === "completed" ? "completed" : "running"}
+          />
+        )}
 
-        {(tab === "run_log" || status === "orchestrating") && (
+        {tab === "report" && (
+          <ReportTab
+            reportMarkdown={
+              reportMarkdown || "# Report\n\n(Generating...)"
+            }
+            researchId={researchId || "temp"}
+          />
+        )}
+
+        {tab === "sources" && <SourcesTab sources={sources} />}
+
+        {tab === "files" && (
+          <FilesTab
+            artifacts={artifacts}
+            selectedArtifactId={selectedArtifactId}
+            setSelectedArtifactId={setSelectedArtifactId}
+          />
+        )}
+
+        {tab === "run_log" && (
           <section className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-4">
               <h2 className="text-sm font-semibold text-gray-900">Run log</h2>
