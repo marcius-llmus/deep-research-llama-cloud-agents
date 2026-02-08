@@ -64,11 +64,11 @@ export default function ResearchSessionPage() {
   };
 
   useEffect(() => {
-    if (!orchestratorHandlerId) return;
+    if (!orchestratorHandler) return;
     
     const sub = orchestratorHandler.subscribeToEvents({
       onData: (event) => {
-        const eventName = event.type || event.name || "";
+        const eventName = event.type;
         let type = eventName.split('.').pop() || eventName;
         if (type === "ToolCallEvent") type = "ToolCall";
         if (type === "ToolCallResultEvent") type = "ToolCallResult";
@@ -78,7 +78,7 @@ export default function ResearchSessionPage() {
 
         const mappedEvent: FunctionAgentEvent = {
           type: type as any,
-          data: event.data,
+          data: (event.data || {}),
           ts: new Date().toISOString(),
         };
         setOrchestratorEvents(prev => [...prev, mappedEvent]);
@@ -89,7 +89,7 @@ export default function ResearchSessionPage() {
     });
     
     return () => sub.unsubscribe();
-  }, [orchestratorHandlerId, orchestratorHandler]);
+  }, [orchestratorHandlerId]);
 
   useEffect(() => {
     const label = researchId || "New Session";

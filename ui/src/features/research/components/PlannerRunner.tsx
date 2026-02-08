@@ -2,7 +2,7 @@ import { useWorkflow, useHandler, WorkflowEvent } from "@llamaindex/ui";
 import { useEffect, useRef, useState } from "react";
 import { WORKFLOWS } from "@/lib/workflows.ts";
 import { Send } from "lucide-react";
-import { parsePlannerFeedbackRequestEvent } from "../utils";
+import { parseInputRequiredEvent } from "../utils";
 
 interface Message {
   role: "user" | "planner";
@@ -28,6 +28,11 @@ export function PlannerRunner({
 
   const startedRef = useRef(false);
 
+  const onCompleteRef = useRef(onComplete);
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
+
   useEffect(() => {
     if (startedRef.current) return;
     startedRef.current = true;
@@ -45,15 +50,15 @@ export function PlannerRunner({
       }
     }
 
-    startWorkflow();
+    void startWorkflow();
   }, [initialQuery, workflow]);
 
   useEffect(() => {
-    if (!handlerId || !handler) return;
+    if (!handler) return;
 
     const sub = handler.subscribeToEvents({
       onData: (event: WorkflowEvent) => {
-        const rawText = parsePlannerFeedbackRequestEvent(event);
+        const rawText = parseInputRequiredEvent(event);
 
         if (rawText) {
           setMessages((prev) => [...prev, { role: "planner", content: rawText }]);
@@ -72,16 +77,20 @@ export function PlannerRunner({
 
         setAwaitingHuman(false);
         setStatusText("Planning complete.");
-        onComplete?.(result.plan);
+        if (onCompleteRef.current) {
+          onCompleteRef.current(result.plan);
+        }
       },
       onError: (err) => {
         console.error("Workflow stream error:", err);
         setStatusText("Stream error occurred.");
-      },
+      }
     });
 
-    return () => sub.unsubscribe();
-  }, [handlerId, handler, onComplete]);
+    return () => {
+      sub.unsubscribe();
+    };
+  }, [handlerId]);
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;
@@ -95,10 +104,6 @@ export function PlannerRunner({
     setInputValue(""); // Clear input just in case
 
     try {
-      if (!handler) {
-        throw new Error("Planner handler not ready (missing handler instance). Try again in a moment.");
-      }
-
       await handler.sendEvent({
         type: "HumanResponseEvent",
         data: { response },
