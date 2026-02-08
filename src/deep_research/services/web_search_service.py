@@ -128,7 +128,7 @@ class WebSearchService:
         return "\n\n".join(context_parts)
 
     @classmethod
-    async def perform_search_for_agent(cls, query: str, max_results: int = 10) -> tuple[list[dict], int]:
+    async def search_google(cls, query: str, max_results: int = 10) -> tuple[list[dict], int]:
         """
         Performs a Google search and returns a list of organic result dictionaries.
         """
