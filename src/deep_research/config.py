@@ -36,7 +36,7 @@ class LLMConfig(BaseModel):
     can be extended as we iterate.
     """
 
-    provider: Literal["openai"] = "openai"
+    provider: Literal["openai", "gemini"] = "openai"
     model: str = "gpt-5"
     temperature: float = 0.2
     reasoning_effort: Literal["low", "medium", "high"] = "low"

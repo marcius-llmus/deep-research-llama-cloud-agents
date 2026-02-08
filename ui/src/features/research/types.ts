@@ -39,4 +39,3 @@ export type ResearchSession = {
   sources: ResearchSource[];
   artifacts: ResearchArtifact[];
 };
-

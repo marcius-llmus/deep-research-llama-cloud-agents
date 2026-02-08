@@ -1,4 +1,3 @@
-// Event type discriminator
 export type AgentEventType =
   | "AgentStream"
   | "ToolCall"
@@ -8,7 +7,6 @@ export type AgentEventType =
   | "StopEvent"
   | "WorkflowCancelledEvent";
 
-// Typed event data payloads (matching the Python event classes)
 export type AgentStreamData = {
   delta: string;
   response: string;
@@ -35,7 +33,6 @@ export type ToolCallResultData = {
     is_error?: boolean;
   };
   return_direct: boolean;
-  // For update_report tool, we include the new report
   new_report_markdown?: string;
 };
 
@@ -58,7 +55,6 @@ export type WorkflowCancelledData = {
   reason?: string;
 };
 
-// Union of all event data types
 export type AgentEventData =
   | AgentStreamData
   | ToolCallData
@@ -68,14 +64,12 @@ export type AgentEventData =
   | StopEventData
   | WorkflowCancelledData;
 
-// The main event type used throughout the UI
 export type FunctionAgentEvent = {
   ts: string;
   type: AgentEventType;
   data: Record<string, unknown>;
 };
 
-// Type guards for event data
 export function isToolCall(event: FunctionAgentEvent): event is FunctionAgentEvent & { data: ToolCallData } {
   return event.type === "ToolCall";
 }

@@ -2,7 +2,7 @@
   "research": {
     "llm": {
       "provider": "gemini",
-      "model": "gemini-3.0-preview",
+      "model": "gemini-3-flash-preview",
       "temperature": 0.2,
       "reasoning_effort": "high"
     },

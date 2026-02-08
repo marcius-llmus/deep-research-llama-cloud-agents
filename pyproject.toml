@@ -18,6 +18,7 @@ dependencies = [
     "llama-index-readers-oxylabs>=0.1.2",
     "llama-index-readers-web>=0.5.6",
     "trafilatura>=2.0.0",
+    "llama-index-llms-google-genai>=0.8.7",
 ]
 
 [project.scripts]
@@ -60,9 +61,11 @@ env_files = [".env"]
 llama_cloud = true
 
 [tool.llamadeploy.workflows]
-research-metadata = "deep_research.research_metadata_workflow:workflow"
-deep-research-plan = "deep_research.research_plan_workflow:workflow"
-function-agent = "deep_research.function_agent_workflow:workflow"
+# NOTE: Workflow targets must point at modules that define a module-level `workflow = ...`.
+# Planner workflow (HITL)
+deep-research-plan = "deep_research.workflows.planner.workflow:workflow"
+# Orchestrator workflow (decoupled; exposes only the fake frontend tool)
+function-agent = "deep_research.workflows.research.orchestrator.agent:workflow"
 
 [tool.llamadeploy.ui]
 directory = "ui"
