@@ -29,7 +29,7 @@ llm = OpenAI(
 
 
 async def call_research_agent(ctx: Context, prompt: str) -> str:
-    print(f"Orchestrator -> ResearchAgent: {prompt}")
+    print(f"Orchestrator -> SearcherAgent: {prompt}")
 
     result = await searcher_agent.run(
         user_msg=f"Write some notes about the following: {prompt}",
