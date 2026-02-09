@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import re
 from typing import Annotated
 
 from llama_index.core.tools.tool_spec.base import BaseToolSpec
@@ -9,21 +8,17 @@ from pydantic import Field
 from workflows import Context
 
 from deep_research.config import ResearchConfig
-from deep_research.services.research_llm_service import ResearchLLMService
 from deep_research.services.web_search_service import WebSearchService
-from deep_research.services.document_parser_service import DocumentParserService
+from deep_research.services.evidence_service import EvidenceService
+from deep_research.services.query_service import QueryService
 
-from deep_research.workflows.research.searcher.models import EvidenceBundle, EvidenceItem
+from deep_research.workflows.research.searcher.models import EvidenceBundle
 from deep_research.workflows.research.state_keys import (
-    # ReportStateKey,
     ResearchStateKey,
     StateNamespace,
 )
 
 logger = logging.getLogger(__name__)
-
-
-URL_RE = re.compile(r"https?://[^\s)\]]+")
 
 
 class SearcherTools(BaseToolSpec):
@@ -39,14 +34,14 @@ class SearcherTools(BaseToolSpec):
         self,
         *,
         config: ResearchConfig,
-        web_search_service: WebSearchService | None = None,
-        llm_service: ResearchLLMService | None = None,
-        document_parser_service: DocumentParserService | None = None,
+        web_search_service: WebSearchService,
+        query_service: QueryService,
+        evidence_service: EvidenceService,
     ):
         self.config = config
-        self.web_search_service = web_search_service or WebSearchService()
-        self.llm_service = llm_service or ResearchLLMService()
-        self.document_parser_service = document_parser_service or DocumentParserService()
+        self.web_search_service = web_search_service
+        self.query_service = query_service
+        self.evidence_service = evidence_service
 
     @staticmethod
     def _get_seen_urls(state: dict) -> set[str]:
@@ -58,10 +53,9 @@ class SearcherTools(BaseToolSpec):
 
     async def optimize_query(
         self,
-        ctx: Context,
         query: Annotated[str, Field(description="User query to rewrite for better web search.")],
     ) -> str:
-        return await self.llm_service.generate_optimized_query(query=query, llm=ctx.llm)
+        return await self.query_service.generate_optimized_query(query=query)
 
     async def search_web(
         self,
@@ -73,7 +67,7 @@ class SearcherTools(BaseToolSpec):
 
         search_data, _requests_made = await self.web_search_service.search_google(
             query=query,
-            max_results=self.config.settings.max_search_results_per_query,
+            max_results=self.config.searcher.max_results_per_query,
         )
         if not search_data:
             return "No results found for this query."
@@ -105,61 +99,25 @@ class SearcherTools(BaseToolSpec):
 
         candidate_urls: list[str] = []
         for url in urls:
-            if url and url not in seen_urls:
-                candidate_urls.append(url)
+            if not url:
+                continue
+            if url in seen_urls:
+                continue
+            candidate_urls.append(url)
+
+        candidate_urls = candidate_urls[: self.config.searcher.max_results_per_query]
 
         if not candidate_urls:
             return "All provided URLs have already been processed."
 
-        # 1) Fetch HTML content in batch; PDF/CSV parsing is mocked.
-        html_urls = [u for u in candidate_urls if self.document_parser_service.classify(u) == "html"]
-        html_content_map = await self.web_search_service.read_multiple_pages_content(html_urls)
-
-        new_items: list[EvidenceItem] = []
-        failures: list[str] = []
-
-        for url in candidate_urls:
-            content_type = self.document_parser_service.classify(url)
-            raw_text = html_content_map.get(url, "") if content_type == "html" else None
-            parsed = await self.document_parser_service.parse_stub(source=url, text=raw_text)
-
-            parsed_text = (parsed.text or "").strip()
-            if not parsed_text or "Could not read" in parsed_text or "error occurred" in parsed_text:
-                failures.append(url)
-                seen_urls.add(url)
-                continue
-
-            enriched = await self.llm_service.enrich_evidence(
-                source=url,
-                directive=directive,
-                content=parsed_text,
-                llm=ctx.llm,
-            )
-
-            relevance = float(enriched.get("relevance") or 0.0)
-            bullets = [b for b in (enriched.get("bullets") or []) if b][:6]
-            summary = (enriched.get("summary") or "").strip() or None
-            topics = [t for t in (enriched.get("topics") or []) if t][:7]
-
-            if not bullets and not summary:
-                # No useful metadata; still mark as seen to avoid loops.
-                seen_urls.add(url)
-                continue
-
-            new_items.append(
-                EvidenceItem(
-                    url=url,
-                    title=None,
-                    content_type=parsed.content_type,
-                    summary=summary,
-                    topics=topics,
-                    bullets=bullets,
-                    relevance=relevance,
-                )
-            )
+        content_map = await self.web_search_service.read_multiple_pages_content(candidate_urls)
+        new_items, failures = await self.evidence_service.generate_evidence(content_map, directive)
+        
+        for item in new_items:
+            seen_urls.add(item.url)
+        for url in failures:
             seen_urls.add(url)
 
-        # 3) Persist to state: merge into pending evidence + update seen resources.
         async with ctx.store.edit_state() as st:
             research_state = st[StateNamespace.RESEARCH]
 
@@ -185,7 +143,6 @@ class SearcherTools(BaseToolSpec):
             research_state[ResearchStateKey.PENDING_EVIDENCE] = pending.model_dump()
             self._set_seen_urls(st, seen_urls)
 
-        # 4) Natural language response
         lines: list[str] = [f"Enriched {len(new_items)} new sources."]
         if new_items:
             top = sorted(new_items, key=lambda i: i.relevance, reverse=True)[:3]
@@ -197,7 +154,7 @@ class SearcherTools(BaseToolSpec):
             lines.append(f"Failed to parse/read {len(failures)} sources.")
         return "\n".join(lines)
 
-    async def get_gathered_evidence_summary(self, ctx: Context) -> str:
+    async def get_gathered_evidence_summary(self, ctx: Context) -> str: # noqa
         state = await ctx.store.get_state()
         pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
         pending = EvidenceBundle.model_validate(pending_raw)
@@ -216,15 +173,12 @@ class SearcherTools(BaseToolSpec):
         for item in pending.items:
             insights.extend(item.bullets)
 
-        queries = await self.llm_service.generate_follow_up_queries(
+        queries = await self.query_service.generate_follow_up_queries(
             insights=insights,
             original_query=original_query,
-            llm=ctx.llm,
         )
 
         async with ctx.store.edit_state() as st:
             st[StateNamespace.RESEARCH][ResearchStateKey.FOLLOW_UP_QUERIES] = queries
 
         return "\n".join(f"- {q}" for q in queries)
-
- 
