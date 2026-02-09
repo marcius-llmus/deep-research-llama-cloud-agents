@@ -1,11 +1,10 @@
 import logging
 import os
-from typing import List, Dict
+from typing import List, Dict, Any, Tuple
 
 from llama_index.core.schema import Document
 from llama_index.readers.oxylabs import OxylabsGoogleSearchReader
 from llama_index.readers.web import OxylabsWebReader
-
 
 logger = logging.getLogger(__name__)
 
@@ -16,69 +15,51 @@ class WebSearchService:
     """A service to encapsulate complex web search logic."""
 
     def __init__(self) -> None:
-        username = os.getenv("OXYLABS_USERNAME")
-        password = os.getenv("OXYLABS_PASSWORD")
-        if not username or not password:
+        self._username = os.getenv("OXYLABS_USERNAME")
+        self._password = os.getenv("OXYLABS_PASSWORD")
+        if not self._username or not self._password:
             raise ValueError(
                 "Oxylabs credentials are required. Set OXYLABS_USERNAME and OXYLABS_PASSWORD."
             )
-        self._username = username
-        self._password = password
-
-    def _get_credentials(self) -> tuple[str, str]:
-        return self._username, self._password
 
     @staticmethod
-    def extract_urls_from_search_data(search_data: List[Document]) -> List[str]:
-        """Extracts unique URLs from Oxylabs search data, preserving order."""
-        urls: list[str] = []
-        seen: set[str] = set()
-        for doc in search_data:
-            url = doc.metadata.get("source_url") or doc.metadata.get("url")
-            if not url or url in seen:
-                continue
-            seen.add(url)
-            urls.append(url)
-        return urls
+    def extract_urls_from_search_data(search_data: Any) -> List[str]:
+        """Extracts unique URLs from Oxylabs search data."""
+        all_urls = []
+        for page_result in search_data.results:
+            try:
+                # page_result might be an object with .content attribute (dict)
+                content = page_result.content
+                if isinstance(content, dict):
+                    organic_results = content.get('results', {}).get('organic', [])
+                    for organic_result in organic_results:
+                        url = organic_result.get('url')
+                        if url:
+                            all_urls.append(url)
+            except (TypeError, KeyError, AttributeError):
+                logger.warning("Could not parse organic results from a page in WebSearchService.")
+        return all_urls
 
-    async def perform_search(
-        self, query: str, pages: int = 1, *, start: int = 0
-    ) -> List[Document]:
-        """Performs a Google search and returns the raw search data object (Async)."""
+    async def perform_search(self, query: str, pages: int = 1) -> Any:
+        """Performs a Google search and returns the raw search data object."""
         logger.info(f"Performing Google search for query: '{query}' on {pages} page(s).")
-
-        reader = OxylabsGoogleSearchReader(username=self._username, password=self._password)
-        search_params: dict = {
-            "query": query,
-            "parse": True,
-        }
-        if pages and pages > 1:
-            search_params["pages"] = pages
-        if start:
-            search_params["start"] = start
-
-        return await reader.aload_data(search_params)
+        search_reader = OxylabsGoogleSearchReader(username=self._username, password=self._password)
+        return await search_reader.aget_response({'query': query, 'pages': pages, 'parse': True})
 
     async def search_and_extract_urls(self, query: str, pages: int = 1) -> List[str]:
         """Performs a search and returns a list of unique URLs."""
-        search_docs = await self.perform_search(query, pages)
-        return self.extract_urls_from_search_data(search_docs)
+        search_data = await self.perform_search(query, pages)
+        return self.extract_urls_from_search_data(search_data)
 
     async def search_and_extract_urls_by_count(self, query: str, max_results: int = 10) -> List[str]:
-        """
-        Performs Google searches across multiple pages until reaching the target number of URLs.
-        """
-        collected_urls: list[str] = []
+        """Performs Google searches across multiple pages until reaching the target number of URLs."""
+        collected_urls: List[str] = []
         current_page = 1
 
         while len(collected_urls) < max_results and current_page <= MAX_PAGES_CAP:
             try:
-                search_docs = await self.perform_search(
-                    query,
-                    pages=1,
-                    start=(current_page - 1) * 10,
-                )
-                page_urls = self.extract_urls_from_search_data(search_docs)
+                search_data = await self.perform_search(query, pages=current_page)
+                page_urls = self.extract_urls_from_search_data(search_data)
 
                 if not page_urls:
                     break
@@ -104,59 +85,55 @@ class WebSearchService:
             return []
 
         reader = OxylabsWebReader(username=self._username, password=self._password)
-        return await reader.aload_data(urls=unique_urls)
+        documents = await reader.aload_data(urls=unique_urls)
+        logger.info(f"WebSearchService read content from {len(documents)} pages for {max_results} target results.")
+        return documents
 
     async def get_serp_content_as_text(self, query: str, pages: int = 1) -> str:
         """Performs a search and returns the SERP content as a formatted markdown string."""
-        search_docs = await self.perform_search(query, pages=pages)
+        search_data = await self.perform_search(query, pages=pages)
         context_parts = []
-        
-        for doc in search_docs:
-            title = doc.metadata.get("title", "No Title")
-            url = doc.metadata.get("source_url", doc.metadata.get("url", "No URL"))
-            description = doc.text[:300] if doc.text else "No Description"
-            context_parts.append(f"Title: {title}\nURL: {url}\nDescription: {description}\n---")
+
+        for page_result in search_data.results:
+            try:
+                content = page_result.content
+                organic_results = content.get('results', {}).get('organic', [])
+                for result in organic_results:
+                    title = result.get('title', 'No Title')
+                    description = result.get('desc', 'No Description')
+                    url = result.get('url', 'No URL')
+                    context_parts.append(f"Title: {title}\nURL: {url}\nDescription: {description}\n---")
+            except (AttributeError, KeyError):
+                pass
 
         if not context_parts:
-            return f"Web search for query '{query}' returned no parsable organic results."
+            raise ValueError(f"Web search for query '{query}' returned no parsable organic results.")
 
         return "\n\n".join(context_parts)
 
-    async def search_google(self, query: str, max_results: int = 10) -> tuple[list[dict], int]:
+    async def search_google(self, query: str, max_results: int = 10) -> Tuple[List[Dict], int]:
         """
         Performs a Google search and returns a list of organic result dictionaries.
+        Optimized for agents.
         """
-        collected_results: list[dict] = []
+        collected_results: List[Dict] = []
         current_page = 1
         requests_made = 0
 
         while len(collected_results) < max_results and current_page <= MAX_PAGES_CAP:
             try:
-                search_docs = await self.perform_search(
-                    query,
-                    pages=1,
-                    start=(current_page - 1) * 10,
-                )
+                search_data = await self.perform_search(query, pages=current_page)
                 requests_made += 1
+                page_results = []
 
-                if not search_docs:
+                for page in search_data.results:
+                    content = page.content
+                    page_results.extend(content.get('results', {}).get('organic', []))
+
+                if not page_results:
                     break
 
-                for doc in search_docs:
-                    url = doc.metadata.get("source_url") or doc.metadata.get("url", "")
-                    if not url:
-                        continue
-                    collected_results.append(
-                        {
-                            "title": doc.metadata.get("title", "No Title"),
-                            "url": url,
-                            "desc": doc.text[:300] if doc.text else "",
-                        }
-                    )
-
-                if len(collected_results) >= max_results:
-                    break
-
+                collected_results.extend(page_results)
                 current_page += 1
             except Exception as e:
                 logger.error(f"Error searching page {current_page} for query '{query}': {e}")
@@ -167,18 +144,17 @@ class WebSearchService:
     async def read_multiple_pages_content(self, urls: List[str]) -> Dict[str, str]:
         """
         Reads the content of multiple URLs concurrently.
-        Returns a dictionary mapping URL to its content or a descriptive error message on failure.
         """
         if not urls:
             return {}
 
-        reader = OxylabsWebReader(username=self._username, password=self._password)
-        
         try:
+            reader = OxylabsWebReader(username=self._username, password=self._password)
             documents = await reader.aload_data(urls=urls)
-            
-            content_map = {doc.metadata.get('source_url', doc.metadata.get('url', 'unknown')): doc.text for doc in documents}
 
+            content_map = {doc.metadata['url']: doc.text for doc in documents if 'url' in doc.metadata}
+
+            # For URLs that failed
             for url in urls:
                 if url not in content_map:
                     content_map[url] = f"Could not read any content from the URL: {url}"
