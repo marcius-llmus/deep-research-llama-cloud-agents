@@ -1,7 +1,5 @@
-from __future__ import annotations
-
 import logging
-from typing import Annotated
+from typing import Annotated, List
 
 from llama_index.core.tools.tool_spec.base import BaseToolSpec
 from pydantic import Field
@@ -23,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class SearcherTools(BaseToolSpec):
     spec_functions = [
-        "optimize_query",
+        "refine_query",
         "follow_up_queries",
         "search_web",
         "process_sources",
@@ -51,7 +49,7 @@ class SearcherTools(BaseToolSpec):
     def _set_seen_urls(state: dict, seen: set[str]) -> None:
         state[StateNamespace.RESEARCH][ResearchStateKey.SEEN_URLS] = sorted(seen)
 
-    async def optimize_query(
+    async def refine_query(
         self,
         query: Annotated[str, Field(description="User query to rewrite for better web search.")],
     ) -> str:
@@ -88,7 +86,7 @@ class SearcherTools(BaseToolSpec):
     async def process_sources(
         self,
         ctx: Context,
-        urls: Annotated[list[str], Field(description="URLs to read.")],
+        urls: Annotated[List[str], Field(description="URLs to read.")],
         directive: Annotated[str, Field(description="What to extract and why it matters.")],
     ) -> str:
         if not urls:

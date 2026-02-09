@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from typing import Annotated
 
 from llama_index.core.tools.tool_spec.base import BaseToolSpec
@@ -7,7 +5,6 @@ from workflows import Context
 from pydantic import Field
 
 from deep_research.config import ResearchConfig
-from deep_research.services.file_service import read_text_file, write_text_file
 from deep_research.services.report_patch_service import ReportPatchService
 from deep_research.workflows.research.reviewer.agent import workflow as reviewer_agent
 from deep_research.workflows.research.state_keys import (
@@ -20,7 +17,6 @@ from deep_research.workflows.research.state_keys import (
 class WriterTools(BaseToolSpec):
     spec_functions = [
         "apply_patch",
-        "update_report",
         "finalize",
         "reviewer",
     ]
@@ -60,28 +56,6 @@ class WriterTools(BaseToolSpec):
 
         return updated
 
-    async def update_report(
-        self,
-        ctx: Context,
-        patch: Annotated[
-            str,
-            Field(
-                description=(
-                    "MOCK patch text to apply to the report file referenced by workflow state `report.path`."
-                )
-            ),
-        ],
-    ) -> str:
-        state = await ctx.store.get_state()
-        report_path = state[StateNamespace.REPORT][ReportStateKey.PATH]
-
-        original = read_text_file(report_path)
-        updated = self.report_patch_service.apply_patch_mock(
-            original_text=original,
-            patch_text=patch,
-        )
-        write_text_file(report_path, updated)
-        return updated
 
     async def finalize(self, ctx: Context) -> str:
         async with ctx.store.edit_state() as state:

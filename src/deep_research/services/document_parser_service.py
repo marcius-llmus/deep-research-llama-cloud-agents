@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from deep_research.services.models import ParsedDocument
 
 

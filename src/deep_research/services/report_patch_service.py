@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-
 class ReportPatchService:
     """Applies patch text to a report."""
 
