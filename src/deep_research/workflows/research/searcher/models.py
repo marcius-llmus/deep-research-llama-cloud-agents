@@ -28,6 +28,18 @@ class SearchTurnPlan(BaseModel):
 class EvidenceItem(BaseModel):
     url: str
     title: str | None = None
+    content_type: str | None = Field(
+        default=None,
+        description="Normalized content type for the evidence source (html/pdf/csv/unknown).",
+    )
+    summary: str | None = Field(
+        default=None,
+        description="Cheap-LLM summary used by orchestrator to avoid reading raw content.",
+    )
+    topics: list[str] = Field(
+        default_factory=list,
+        description="Topic tags for routing/decision-making.",
+    )
     bullets: list[str] = Field(default_factory=list)
     relevance: float = Field(
         0.0,
@@ -41,6 +53,19 @@ class EvidenceBundle(BaseModel):
     queries: list[str] = Field(default_factory=list)
     directive: str
     items: list[EvidenceItem] = Field(default_factory=list)
+
+    def get_summary(self) -> str:
+        """Returns a concise summary of all gathered evidence."""
+        if not self.items:
+            return "No evidence gathered yet."
+        
+        lines = [f"Gathered {len(self.items)} evidence items:"]
+        for i, item in enumerate(self.items, 1):
+            summary = item.summary or "No summary available."
+            lines.append(f"{i}. [{item.content_type or 'unknown'}] {item.url}")
+            lines.append(f"   Summary: {summary}")
+            lines.append(f"   Relevance: {item.relevance:.2f}")
+        return "\n".join(lines)
 
 
 class UpdateReportResult(BaseModel):
