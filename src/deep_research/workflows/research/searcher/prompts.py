@@ -15,9 +15,9 @@ GUARDRAILS_SECTION_TMPL = """\
 ## Behavioral Guardrails
 
     To ensure efficient research, you must also adhere to these rules:
-- **Avoid Search Loops:** After using `search_web`, prioritize reading sources with `process_sources` before searching again. Do not perform more than 3 consecutive `search_web` actions.
-- **Process in Batches:** When using `process_sources`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
-- **Efficient Reading:** The `search_web` tool will mark URLs with `(already seen)` when they were already processed.
+- **Avoid Search Loops:** After using `web_search`, prioritize reading sources with `read_and_analyze_webpages` before searching again. Do not perform more than 3 consecutive `web_search` actions.
+- **Process in Batches:** When using `read_and_analyze_webpages`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
+- **Efficient Reading:** The `web_search` tool will mark URLs with `(already seen)` when they were already processed.
 """
 
 STATE_SECTION_TMPL = """\
@@ -30,10 +30,10 @@ WORKFLOW_SECTION_TMPL = """\
 
 For complex research tasks that require gathering and analyzing information from the web, you MUST follow this structured process:
 
-1.  **Review Gathered Evidence:** Use `get_gathered_evidence_summary` to see what you have already collected.
-2.  **Search:** Use `search_web` to find relevant sources.
-3.  **Process Sources:** Use `process_sources` with a clear `directive` to download, parse, and enrich the content from the URLs found. Prefer batches of URLs.
-4.  **Iterate:** Repeat steps (2-3) until you meet the `{min_sources}` minimum sources constraint."""
+1.  **Search:** Use `web_search` to find relevant sources.
+2.  **Process Sources:** Use `read_and_analyze_webpages` with a clear `directive` to download, parse, and enrich the content from the URLs found. Prefer batches of URLs.
+3.  **Iterate:** Repeat steps (1-2) until you meet the `{min_sources}` minimum sources constraint.
+4.  **Finalize:** Use `finalize_research` to complete the task."""
 
 def build_research_system_prompt(config: ResearchConfig) -> str:
     """Assembles and formats the complete system prompt."""

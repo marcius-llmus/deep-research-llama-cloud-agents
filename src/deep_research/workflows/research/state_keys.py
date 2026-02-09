@@ -14,6 +14,7 @@ class OrchestratorStateKey(StrEnum):
 
 class ResearchStateKey(StrEnum):
     SEEN_URLS = "seen_urls"
+    FAILED_URLS = "failed_urls"
     PENDING_EVIDENCE = "pending_evidence"
     FOLLOW_UP_QUERIES = "follow_up_queries"
 
