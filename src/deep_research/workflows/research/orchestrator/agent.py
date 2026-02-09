@@ -2,7 +2,7 @@ import re
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.tools import FunctionTool
 from llama_index.core.workflow import Context
-from llama_index.llms.openai import OpenAI
+from llama_index.llms.google_genai import GoogleGenAI
 
 from deep_research.config import ResearchConfig
 from deep_research.utils import load_config_from_json
@@ -26,13 +26,8 @@ cfg = load_config_from_json(
     label="Research Config",
     description="Deep research collection + settings",
 )
-llm_cfg = cfg.llm
-
-llm = OpenAI(
-    model=llm_cfg.model,
-    temperature=llm_cfg.temperature,
-    reasoning_effort=llm_cfg.reasoning_effort,
-)
+llm_cfg = cfg.orchestrator.main_llm
+llm = GoogleGenAI(model=llm_cfg.model, temperature=llm_cfg.temperature)
 
 
 async def call_research_agent(ctx: Context, prompt: str) -> str:
