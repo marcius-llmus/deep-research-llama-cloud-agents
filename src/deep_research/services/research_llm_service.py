@@ -5,9 +5,17 @@ from typing import Dict, List
 from llama_index.core import PromptTemplate
 from llama_index.core.llms import LLM
 
-from deep_research.services.models import InsightExtractionResponse, FollowUpQueryResponse
+from deep_research.services.models import (
+    EvidenceEnrichmentResponse,
+    FollowUpQueryResponse,
+    InsightExtractionResponse,
+)
 from deep_research.services.prompts import (
-    EXTRACT_INSIGHTS_PROMPT, GENERATE_FOLLOW_UPS_PROMPT, OPTIMIZE_QUERY_INSTRUCTION, ENRICH_QUERY_FOR_SYNTHESIS_PROMPT,
+    ENRICH_EVIDENCE_PROMPT,
+    ENRICH_QUERY_FOR_SYNTHESIS_PROMPT,
+    EXTRACT_INSIGHTS_PROMPT,
+    GENERATE_FOLLOW_UPS_PROMPT,
+    OPTIMIZE_QUERY_INSTRUCTION,
 )
 
 logger = logging.getLogger(__name__)
@@ -91,3 +99,47 @@ class ResearchLLMService:
         except Exception as e:
             logger.error(f"Failed to enrich query '{user_query}': {e}. Falling back to original query.", exc_info=True)
             return user_query
+
+    @classmethod
+    async def enrich_evidence(
+        cls,
+        *,
+        source: str,
+        directive: str,
+        content: str,
+        llm: LLM,
+        max_chars: int = 12000,
+    ) -> Dict:
+        """Generate compact orchestrator-friendly metadata for a parsed evidence source.
+
+        Returns a dict with: summary/topics/bullets/relevance.
+        """
+
+        try:
+            trimmed = (content or "").strip()
+            if max_chars and len(trimmed) > max_chars:
+                trimmed = trimmed[:max_chars]
+
+            prompt_template = PromptTemplate(template=ENRICH_EVIDENCE_PROMPT)
+            structured_response = await llm.astructured_predict(
+                EvidenceEnrichmentResponse,
+                prompt=prompt_template,
+                directive=directive,
+                source=source,
+                content=trimmed,
+            )
+
+            payload = structured_response.parsed_output.model_dump()
+            # Normalize topics/bullets to keep them small.
+            payload["topics"] = [t.strip() for t in (payload.get("topics") or []) if t and t.strip()][:7]
+            payload["bullets"] = [b.strip() for b in (payload.get("bullets") or []) if b and b.strip()][:6]
+            payload["summary"] = (payload.get("summary") or "").strip()
+            return payload
+        except Exception as e:
+            logger.error(f"Failed to enrich evidence for source '{source}': {e}", exc_info=True)
+            return {
+                "summary": "",
+                "topics": [],
+                "bullets": [],
+                "relevance": 0.0,
+            }
