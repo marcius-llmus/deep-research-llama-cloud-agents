@@ -11,11 +11,11 @@ from workflows import Context
 from deep_research.config import ResearchConfig
 from deep_research.services.research_llm_service import ResearchLLMService
 from deep_research.services.web_search_service import WebSearchService
-from deep_research.services.file_service import read_text_file
+from deep_research.services.document_parser_service import DocumentParserService
 
 from deep_research.workflows.research.searcher.models import EvidenceBundle, EvidenceItem
 from deep_research.workflows.research.state_keys import (
-    ReportStateKey,
+    # ReportStateKey,
     ResearchStateKey,
     StateNamespace,
 )
@@ -29,11 +29,10 @@ URL_RE = re.compile(r"https?://[^\s)\]]+")
 class SearcherTools(BaseToolSpec):
     spec_functions = [
         "optimize_query",
-        "get_report",
-        "search_web",
-        "read_and_extract_evidence",
-        "update_pending_evidence",
         "follow_up_queries",
+        "search_web",
+        "process_sources",
+        "get_gathered_evidence_summary",
     ]
 
     def __init__(
@@ -42,14 +41,12 @@ class SearcherTools(BaseToolSpec):
         config: ResearchConfig,
         web_search_service: WebSearchService | None = None,
         llm_service: ResearchLLMService | None = None,
+        document_parser_service: DocumentParserService | None = None,
     ):
         self.config = config
         self.web_search_service = web_search_service or WebSearchService()
         self.llm_service = llm_service or ResearchLLMService()
-
-    @staticmethod
-    def _get_report_path(state: dict) -> str:
-        return state[StateNamespace.REPORT][ReportStateKey.PATH]
+        self.document_parser_service = document_parser_service or DocumentParserService()
 
     @staticmethod
     def _get_seen_urls(state: dict) -> set[str]:
@@ -58,15 +55,6 @@ class SearcherTools(BaseToolSpec):
     @staticmethod
     def _set_seen_urls(state: dict, seen: set[str]) -> None:
         state[StateNamespace.RESEARCH][ResearchStateKey.SEEN_URLS] = sorted(seen)
-
-    @classmethod
-    def _extract_urls_from_text(cls, text: str) -> set[str]:
-        return set(URL_RE.findall(text))
-
-    async def get_report(self, ctx: Context) -> str:
-        state = await ctx.store.get_state()
-        report_path = self._get_report_path(state)
-        return read_text_file(report_path)
 
     async def optimize_query(
         self,
@@ -82,9 +70,6 @@ class SearcherTools(BaseToolSpec):
     ) -> str:
         state = await ctx.store.get_state()
         seen_urls = self._get_seen_urls(state)
-        report_path = self._get_report_path(state)
-        report_text = read_text_file(report_path)
-        seen_urls |= self._extract_urls_from_text(report_text)
 
         search_data, _requests_made = await self.web_search_service.search_google(
             query=query,
@@ -106,21 +91,17 @@ class SearcherTools(BaseToolSpec):
 
         return "\n\n".join(formatted_results)
 
-    async def read_and_extract_evidence(
+    async def process_sources(
         self,
         ctx: Context,
         urls: Annotated[list[str], Field(description="URLs to read.")],
-        directive: Annotated[str, Field(description="What to extract from these pages.")],
+        directive: Annotated[str, Field(description="What to extract and why it matters.")],
     ) -> str:
         if not urls:
-            return EvidenceBundle(queries=[], directive=directive, items=[]).model_dump_json()
+            return "No URLs provided."
 
         state = await ctx.store.get_state()
         seen_urls = self._get_seen_urls(state)
-        report_path = self._get_report_path(state)
-
-        report_text = read_text_file(report_path)
-        seen_urls |= self._extract_urls_from_text(report_text)
 
         candidate_urls: list[str] = []
         for url in urls:
@@ -128,75 +109,99 @@ class SearcherTools(BaseToolSpec):
                 candidate_urls.append(url)
 
         if not candidate_urls:
-            return EvidenceBundle(queries=[], directive=directive, items=[]).model_dump_json()
+            return "All provided URLs have already been processed."
 
-        max_urls = min(len(candidate_urls), 5)
-        candidate_urls = candidate_urls[:max_urls]
+        # 1) Fetch HTML content in batch; PDF/CSV parsing is mocked.
+        html_urls = [u for u in candidate_urls if self.document_parser_service.classify(u) == "html"]
+        html_content_map = await self.web_search_service.read_multiple_pages_content(html_urls)
 
-        content_map = await self.web_search_service.read_multiple_pages_content(candidate_urls)
+        new_items: list[EvidenceItem] = []
+        failures: list[str] = []
 
-        items: list[EvidenceItem] = []
-        for url, raw_content in content_map.items():
-            if not raw_content or "Could not read" in raw_content or "error occurred" in raw_content:
+        for url in candidate_urls:
+            content_type = self.document_parser_service.classify(url)
+            raw_text = html_content_map.get(url, "") if content_type == "html" else None
+            parsed = await self.document_parser_service.parse_stub(source=url, text=raw_text)
+
+            parsed_text = (parsed.text or "").strip()
+            if not parsed_text or "Could not read" in parsed_text or "error occurred" in parsed_text:
+                failures.append(url)
                 seen_urls.add(url)
                 continue
 
-            insights = await self.llm_service.extract_insights_from_content(
-                content=raw_content,
+            enriched = await self.llm_service.enrich_evidence(
+                source=url,
                 directive=directive,
+                content=parsed_text,
                 llm=ctx.llm,
             )
 
-            # Keep only useful bullets
-            good = [i for i in insights if float(i.get("relevance_score", 0.0)) >= 0.65]
-            bullets = [i["content"] for i in good if i.get("content")][:5]
-            if not bullets:
+            relevance = float(enriched.get("relevance") or 0.0)
+            bullets = [b for b in (enriched.get("bullets") or []) if b][:6]
+            summary = (enriched.get("summary") or "").strip() or None
+            topics = [t for t in (enriched.get("topics") or []) if t][:7]
+
+            if not bullets and not summary:
+                # No useful metadata; still mark as seen to avoid loops.
                 seen_urls.add(url)
                 continue
 
-            relevance = max(float(i.get("relevance_score", 0.0)) for i in good) if good else 0.0
-            items.append(
-                EvidenceItem(url=url, bullets=bullets, relevance=relevance)
+            new_items.append(
+                EvidenceItem(
+                    url=url,
+                    title=None,
+                    content_type=parsed.content_type,
+                    summary=summary,
+                    topics=topics,
+                    bullets=bullets,
+                    relevance=relevance,
+                )
             )
             seen_urls.add(url)
 
+        # 3) Persist to state: merge into pending evidence + update seen resources.
         async with ctx.store.edit_state() as st:
-            self._set_seen_urls(st, seen_urls)
+            research_state = st[StateNamespace.RESEARCH]
 
-        bundle = EvidenceBundle(queries=[], directive=directive, items=items)
-        return bundle.model_dump_json()
+            pending_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
+            pending = EvidenceBundle.model_validate(pending_raw)
 
-    async def update_pending_evidence(
-        self,
-        ctx: Context,
-        evidence_bundle_json: Annotated[str, Field(description="EvidenceBundle JSON to merge into pending evidence.")],
-    ) -> str:
-        try:
-            incoming = EvidenceBundle.model_validate_json(evidence_bundle_json)
-        except Exception as e:
-            raise ValueError(f"Invalid evidence bundle JSON: {e}") from e
-
-        async with ctx.store.edit_state() as state:
-            research_state = state[StateNamespace.RESEARCH]
-            existing_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
-
-            existing = EvidenceBundle.model_validate(existing_raw)
-
-            by_url = {i.url: i for i in existing.items}
-            for item in incoming.items:
+            by_url = {i.url: i for i in pending.items}
+            for item in new_items:
                 if item.url in by_url:
-                    merged_bullets = list(dict.fromkeys(by_url[item.url].bullets + item.bullets))
-                    by_url[item.url].bullets = merged_bullets
-                    by_url[item.url].relevance = max(by_url[item.url].relevance, item.relevance)
+                    cur = by_url[item.url]
+                    cur.bullets = list(dict.fromkeys(cur.bullets + item.bullets))
+                    cur.relevance = max(cur.relevance, item.relevance)
+                    cur.summary = item.summary or cur.summary
+                    cur.content_type = item.content_type or cur.content_type
+                    if item.topics:
+                        cur.topics = list(dict.fromkeys(cur.topics + item.topics))
                 else:
                     by_url[item.url] = item
-            existing.items = list(by_url.values())
-            existing.directive = incoming.directive or existing.directive
-            existing.queries = list(dict.fromkeys(existing.queries + incoming.queries))
 
-        research_state[ResearchStateKey.PENDING_EVIDENCE] = existing.model_dump()
+            pending.items = list(by_url.values())
+            pending.directive = directive or pending.directive
+            
+            research_state[ResearchStateKey.PENDING_EVIDENCE] = pending.model_dump()
+            self._set_seen_urls(st, seen_urls)
 
-        return "pending_evidence updated"
+        # 4) Natural language response
+        lines: list[str] = [f"Enriched {len(new_items)} new sources."]
+        if new_items:
+            top = sorted(new_items, key=lambda i: i.relevance, reverse=True)[:3]
+            lines.append("Top sources:")
+            for item in top:
+                lines.append(f"- {item.url} (relevance={item.relevance:.2f}, type={item.content_type or 'unknown'})")
+
+        if failures:
+            lines.append(f"Failed to parse/read {len(failures)} sources.")
+        return "\n".join(lines)
+
+    async def get_gathered_evidence_summary(self, ctx: Context) -> str:
+        state = await ctx.store.get_state()
+        pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
+        pending = EvidenceBundle.model_validate(pending_raw)
+        return pending.get_summary()
 
     async def follow_up_queries(
         self,
