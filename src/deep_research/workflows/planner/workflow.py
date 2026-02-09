@@ -8,11 +8,11 @@ from llama_index.core.memory import BaseMemory, ChatMemoryBuffer
 from llama_index.core.workflow.events import HumanResponseEvent, InputRequiredEvent, StopEvent
 from workflows import Context, Workflow, step
 from workflows.resource import Resource, ResourceConfig
+from llama_index.core.llms import LLM
 
 from deep_research.clients import agent_name, get_llama_cloud_client
 from deep_research.config import ResearchConfig
 from deep_research.workflows.planner.events import PlannerTurnEvent, PlannerOutputEvent, PlanStartEvent
-from llama_index.llms.openai import OpenAI
 
 from deep_research.llm import get_planner_llm_resource
 from deep_research.workflows.planner.models import PlannerAgentOutput, ResearchPlanState
@@ -51,7 +51,7 @@ class DeepResearchPlanWorkflow(Workflow):
         self,
         ctx: Context,
         ev: PlanStartEvent,
-        planner_llm: Annotated[OpenAI, Resource(get_planner_llm_resource)],
+        planner_llm: Annotated[LLM, Resource(get_planner_llm_resource)],
     ) -> PlannerTurnEvent:
         """Initialize run state and memory buffer once, then convert into a turn."""
 
@@ -72,7 +72,7 @@ class DeepResearchPlanWorkflow(Workflow):
         self,
         ctx: Context,
         ev: PlannerTurnEvent,
-        planner_llm: Annotated[OpenAI, Resource(get_planner_llm_resource)],
+        planner_llm: Annotated[LLM, Resource(get_planner_llm_resource)],
     ) -> PlannerOutputEvent:
         """Run the LLM and parse a structured PlannerAgentOutput."""
 
