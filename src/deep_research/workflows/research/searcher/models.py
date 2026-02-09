@@ -40,6 +40,7 @@ class EvidenceItem(BaseModel):
         default_factory=list,
         description="Topic tags for routing/decision-making.",
     )
+    content: str = Field(..., description="Full raw text content of the source.")
     bullets: list[str] = Field(default_factory=list)
     relevance: float = Field(
         0.0,
