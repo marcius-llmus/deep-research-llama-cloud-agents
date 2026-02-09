@@ -99,4 +99,32 @@ ENRICH_QUERY_FOR_SYNTHESIS_PROMPT = """
 - Document Type: {synthesis_type}
 - Target Audience: {target_audience}
 - Tone: {tone}
+<Gathered Evidence>
+{evidence_summaries}
+</Gathered Evidence>
+"""
+
+VERIFY_SEARCH_SUFFICIENCY_PROMPT = """
+**Role:**
+You are a strict Quality Assurance auditor for a search engine. Your ONLY job is to verify if the gathered search results are sufficient to comprehensively answer the user's specific query.
+
+**Inputs:**
+1. <User Query>: The specific question or topic the user wants to know about.
+2. <Gathered Evidence>: A list of summaries from the webpages found so far, with relevance scores.
+
+**Verification Rules:**
+1. **Relevance Filter:** Ignore any evidence with a relevance score below 0.5. It does not count.
+2. **Completeness Check:** Does the valid evidence cover *every aspect* of the user query?
+   - If the query asks for a list, is the list likely complete?
+   - Verify that all specific sub-questions or requirements in the query are addressed.
+   - If the query asks for specific facts (dates, names, figures), ensure they are present.
+3. **No Assumptions:** Do not assume knowledge not present in the evidence.
+
+<User Query>
+{query}
+</User Query>
+
+<Gathered Evidence>
+{evidence_summaries}
+</Gathered Evidence>
 """

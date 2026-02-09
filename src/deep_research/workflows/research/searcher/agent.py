@@ -3,11 +3,11 @@ from deep_research.config import ResearchConfig
 from deep_research.utils import load_config_from_json
 from deep_research.workflows.research.searcher.tools import SearcherTools
 from deep_research.workflows.research.searcher.prompts import build_research_system_prompt
-from deep_research.services.content_analysis_service import ContentAnalysisService
-from deep_research.services.query_service import QueryService
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.document_parser_service import DocumentParserService
+from deep_research.services.query_service import QueryService
+from deep_research.services.content_analysis_service import ContentAnalysisService
 from llama_index.llms.google_genai import GoogleGenAI
 
 cfg = load_config_from_json(
@@ -27,11 +27,12 @@ llm = GoogleGenAI(
 
 document_parser_service = DocumentParserService()
 web_search_service = WebSearchService()
+
 query_service = QueryService(llm_config=searcher_cfg.main_llm)
-analysis_service = ContentAnalysisService(llm_config=searcher_cfg.weak_llm)
+content_analysis_service = ContentAnalysisService(llm_config=searcher_cfg.weak_llm)
 
 evidence_service = EvidenceService(
-    analysis_service=analysis_service,
+    content_analysis_service=content_analysis_service,
     document_parser_service=document_parser_service,
 )
 

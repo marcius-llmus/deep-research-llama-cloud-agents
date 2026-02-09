@@ -17,8 +17,6 @@ class ResearchSettings(BaseModel):
     """Runtime settings for deep research planning/execution."""
 
     max_report_update_size: int = Field(..., ge=1)
-    min_sources: int = Field(..., ge=1)
-    max_sources: int = Field(..., ge=1)
     timeout_seconds: int = Field(..., ge=1)
 
 

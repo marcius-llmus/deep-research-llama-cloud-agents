@@ -28,25 +28,3 @@ class ParsedDocument(BaseModel):
     text: str
     title: str | None = None
     parse_notes: str | None = None
-
-
-class EvidenceEnrichmentResponse(BaseModel):
-    """Structured response for cheap enrichment of an evidence source."""
-
-    summary: str = Field(
-        ..., description="Short neutral summary (3-6 sentences) of the parsed source."
-    )
-    topics: List[str] = Field(
-        default_factory=list,
-        description="3-7 short topic tags for routing/decision-making.",
-    )
-    bullets: List[str] = Field(
-        default_factory=list,
-        description="3-6 key evidence bullets relevant to the directive.",
-    )
-    relevance: float = Field(
-        ...,
-        description="Overall relevance score between 0.0 and 1.0",
-        ge=0.0,
-        le=1.0,
-    )

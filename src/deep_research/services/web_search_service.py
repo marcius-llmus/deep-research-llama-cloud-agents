@@ -32,23 +32,12 @@ class WebSearchService:
         Performs a Google search and returns a list of organic result dictionaries.
         Optimized for agents.
         """
+        search_data = await self.perform_search(query, pages=1)
+        requests_made = 1
+
         collected_results: List[Dict] = []
-        current_page = 1
-        requests_made = 0
-
-        while len(collected_results) < max_results and current_page <= MAX_PAGES_CAP:
-            search_data = await self.perform_search(query, pages=current_page)
-            requests_made += 1
-            
-            if not search_data.results:
-                break
-
-            page_results = []
-            for page in search_data.results:
-                page_results.extend(page.content['results']['organic'])
-            
-            collected_results.extend(page_results)
-            current_page += 1
+        for page in search_data.results:
+            collected_results.extend(page.content['results']['organic'])
 
         return collected_results[:max_results], requests_made
 

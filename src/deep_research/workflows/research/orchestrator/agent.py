@@ -34,14 +34,42 @@ llm = GoogleGenAI(model=llm_cfg.model, temperature=llm_cfg.temperature)
 async def call_research_agent(ctx: Context, prompt: str) -> str:
     print(f"Orchestrator -> SearcherAgent: {prompt}")
 
+    async with ctx.store.edit_state() as state:
+        state[StateNamespace.RESEARCH] = {
+            ResearchStateKey.SEEN_URLS: [],
+            ResearchStateKey.FAILED_URLS: [],
+            ResearchStateKey.PENDING_EVIDENCE: {
+                "queries": [],
+                "directive": "",
+                "items": [],
+            },
+            ResearchStateKey.FOLLOW_UP_QUERIES: [],
+            ResearchStateKey.CURRENT_QUERY: prompt,
+        }
+
     result = await searcher_agent.run(
         user_msg=f"Write some notes about the following: {prompt}",
         ctx=ctx,
     )
 
     async with ctx.store.edit_state() as state:
+        research_state = state[StateNamespace.RESEARCH]
+        pending_evidence = research_state[ResearchStateKey.PENDING_EVIDENCE]
+        items = pending_evidence.get("items", [])
+        
+        sorted_items = sorted(items, key=lambda x: x.get("relevance", 0.0), reverse=True)
+        
+        evidence_lines = []
+        for item in sorted_items:
+            url = item.get("url", "unknown")
+            summary = item.get("summary", "No summary")
+            relevance = item.get("relevance", 0.0)
+            evidence_lines.append(f"- [{relevance:.2f}] {url}: {summary}")
+            
+        evidence_text = "\n".join(evidence_lines) if evidence_lines else "No evidence gathered."
+        
         orch = state[StateNamespace.ORCHESTRATOR]
-        note_entry = f"### Research on '{prompt}':\n{result.response}\n"
+        note_entry = f"### Research on '{prompt}':\n{evidence_text}\n"
         orch[OrchestratorStateKey.RESEARCH_NOTES].append(note_entry)
 
     return str(result.response)
@@ -121,10 +149,11 @@ class OrchestratorWorkflow(Workflow):
                     ResearchStateKey.PENDING_EVIDENCE: {
                         "queries": [],
                         "directive": "",
-                        "items": [],
-                    },
-                    ResearchStateKey.FOLLOW_UP_QUERIES: [],
-                }
+                "items": [],
+            },
+            ResearchStateKey.FOLLOW_UP_QUERIES: [],
+            ResearchStateKey.CURRENT_QUERY: prompt,
+        }
             if StateNamespace.REPORT not in state:
                 state[StateNamespace.REPORT] = {
                     ReportStateKey.PATH: "artifacts/report.md",

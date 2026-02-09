@@ -2,14 +2,13 @@ import logging
 from typing import Annotated, List
 
 from llama_index.core.tools.tool_spec.base import BaseToolSpec
-from pydantic import Field
 from llama_index.core.workflow import Context
+from pydantic import Field
 
 from deep_research.config import ResearchConfig
-from deep_research.services.web_search_service import WebSearchService
 from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.query_service import QueryService
-
+from deep_research.services.web_search_service import WebSearchService
 from deep_research.workflows.research.searcher.models import EvidenceBundle
 from deep_research.workflows.research.state_keys import (
     ResearchStateKey,
@@ -106,17 +105,12 @@ class SearcherTools(BaseToolSpec):
         Reads content from a list of URLs in parallel, analyzes each for insights relevant to a directive,
         and returns a concise summary for each.
         """
-
-        max_urls = 10
-        if len(urls) > max_urls:
-            logger.warning(f"Truncating URLs from {len(urls)} to {max_urls}")
-            urls = urls[:max_urls]
-
         content_map = await self.web_search_service.read_multiple_pages_content(urls)
         new_items, failures = await self.evidence_service.generate_evidence(content_map, directive)
-        
+
         async with ctx.store.edit_state() as st:
             research_state = st[StateNamespace.RESEARCH]
+
             current_failed = research_state.get(ResearchStateKey.FAILED_URLS, [])
             research_state[ResearchStateKey.FAILED_URLS] = list(set(current_failed + failures))
 
@@ -125,9 +119,13 @@ class SearcherTools(BaseToolSpec):
                 seen_urls.add(item.url)
             for url in failures:
                 seen_urls.add(url)
+            self._set_seen_urls(st, seen_urls)
 
             pending_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
             pending = EvidenceBundle.model_validate(pending_raw)
+
+            if directive:
+                pending.directive = directive
 
             by_url = {i.url: i for i in pending.items}
             for item in new_items:
@@ -143,10 +141,7 @@ class SearcherTools(BaseToolSpec):
                     by_url[item.url] = item
 
             pending.items = list(by_url.values())
-            pending.directive = directive or pending.directive
-            
             research_state[ResearchStateKey.PENDING_EVIDENCE] = pending.model_dump()
-            self._set_seen_urls(st, seen_urls)
 
         all_summaries = []
         for item in new_items:
@@ -154,7 +149,7 @@ class SearcherTools(BaseToolSpec):
             if item.bullets:
                 bullets_text = "\n".join([f"- {b}" for b in item.bullets])
                 summary_text += f"\n\nKey Insights:\n{bullets_text}"
-            
+
             all_summaries.append(f"--- Analysis for {item.url} ---\n{summary_text}")
 
         for failed_url in failures:
@@ -162,7 +157,7 @@ class SearcherTools(BaseToolSpec):
 
         if not all_summaries:
             return "No content could be analyzed from the provided URLs."
-        
+
         return "\n\n".join(all_summaries)
 
     async def follow_up_query_generator(
@@ -172,7 +167,7 @@ class SearcherTools(BaseToolSpec):
     ) -> str:
         """
         Based on the insights you've already collected, this tool generates new,
-        specific follow-up questions.
+        specific follow-up questions to help you dig deeper into the research topic.
         """
         state = await ctx.store.get_state()
         pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
@@ -196,17 +191,4 @@ class SearcherTools(BaseToolSpec):
         """
         MUST be called as the final step.
         """
-        state = await ctx.store.get_state()
-        pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
-        pending = EvidenceBundle.model_validate(pending_raw)
-        
-        min_sources = self.config.settings.min_sources
-        successful_count = len(pending.items)
-        
-        if successful_count < min_sources:
-            return (
-                f"Error: You have not gathered enough information. "
-                f"You have gathered {successful_count} sources, but must gather at least {min_sources} sources."
-            )
-            
         return "Research finalized. All gathered documents are now compiled."
