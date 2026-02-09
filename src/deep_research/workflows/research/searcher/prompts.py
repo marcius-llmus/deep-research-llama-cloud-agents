@@ -14,11 +14,10 @@ You must adhere to the following constraints for the entire duration of your res
 GUARDRAILS_SECTION_TMPL = """\
 ## Behavioral Guardrails
 
-To ensure efficient research, you must also adhere to these rules:
-- **Search Query Rules:** Your search queries will automatically exclude PDF and xls or csv files. The `search_web` tool is configured to return a small set of high-quality results.
-- **Avoid Search Loops:** After using `search_web`, prioritize reading sources with `read_and_extract_evidence` before searching again. Do not perform more than 3 consecutive `search_web` actions.
-- **Process in Batches:** When using `read_and_extract_evidence`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
-- **Efficient Reading:** The `search_web` tool will mark URLs with `(already seen)` when they were already included in the report or previously processed.
+    To ensure efficient research, you must also adhere to these rules:
+- **Avoid Search Loops:** After using `search_web`, prioritize reading sources with `process_sources` before searching again. Do not perform more than 3 consecutive `search_web` actions.
+- **Process in Batches:** When using `process_sources`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
+- **Efficient Reading:** The `search_web` tool will mark URLs with `(already seen)` when they were already processed.
 """
 
 STATE_SECTION_TMPL = """\
@@ -31,11 +30,10 @@ WORKFLOW_SECTION_TMPL = """\
 
 For complex research tasks that require gathering and analyzing information from the web, you MUST follow this structured process:
 
-1.  **Review Current Report:** Use `get_report` to understand what's already written.
+1.  **Review Gathered Evidence:** Use `get_gathered_evidence_summary` to see what you have already collected.
 2.  **Search:** Use `search_web` to find relevant sources.
-3.  **Read + Extract Evidence:** Use `read_and_extract_evidence` with a clear `directive` to extract only what matters. Prefer batches of URLs.
-4.  **Accumulate Evidence:** Call `update_pending_evidence` to merge extracted evidence into `research.pending_evidence`.
-5.  **Iterate:** Repeat steps (2-4) until you meet the `{min_sources}` minimum sources constraint."""
+3.  **Process Sources:** Use `process_sources` with a clear `directive` to download, parse, and enrich the content from the URLs found. Prefer batches of URLs.
+4.  **Iterate:** Repeat steps (2-3) until you meet the `{min_sources}` minimum sources constraint."""
 
 def build_research_system_prompt(config: ResearchConfig) -> str:
     """Assembles and formats the complete system prompt."""
