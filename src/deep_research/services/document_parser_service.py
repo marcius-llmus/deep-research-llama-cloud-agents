@@ -14,6 +14,8 @@ class DocumentParserService:
     chart/image OCR, etc.).
     """
 
+
+
     def classify(self, source: str) -> str:
         lowered = (source or "").lower()
         if lowered.endswith(".pdf"):

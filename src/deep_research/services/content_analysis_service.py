@@ -1,15 +1,11 @@
 import logging
-from typing import Any
-
 from llama_index.core import PromptTemplate
 from llama_index.llms.google_genai import GoogleGenAI
 
 from deep_research.config import LLMModelConfig
-from deep_research.services.models import EvidenceEnrichmentResponse, InsightExtractionResponse
-from deep_research.services.prompts import (
-    ENRICH_EVIDENCE_PROMPT,
-    EXTRACT_INSIGHTS_PROMPT,
-)
+from deep_research.services.models import EvidenceEnrichmentResponse
+from deep_research.services.prompts import ENRICH_EVIDENCE_PROMPT
+
 
 logger = logging.getLogger(__name__)
 
