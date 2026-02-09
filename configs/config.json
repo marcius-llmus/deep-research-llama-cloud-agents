@@ -1,17 +1,45 @@
 {
   "research": {
-    "llm": {
-      "provider": "gemini",
-      "model": "gemini-3-flash-preview",
-      "temperature": 0.2,
-      "reasoning_effort": "high"
+    "planner": {
+      "main_llm": {
+        "model": "gemini-3-flash-preview",
+        "temperature": 0.2
+      }
+    },
+    "searcher": {
+      "main_llm": {
+        "model": "gemini-3-flash-preview",
+        "temperature": 0.2
+      },
+      "weak_llm": {
+        "model": "gemini-2.5-flash-lite",
+        "temperature": 0.1
+      },
+      "max_results_per_query": 5
+    },
+    "orchestrator": {
+      "main_llm": {
+        "model": "gemini-3-flash-preview",
+        "temperature": 0.2
+      }
+    },
+    "writer": {
+      "main_llm": {
+        "model": "gemini-3-flash-preview",
+        "temperature": 0.2
+      }
+    },
+    "reviewer": {
+      "main_llm": {
+        "model": "gemini-3-flash-preview",
+        "temperature": 0.1
+      }
     },
     "collections": {
       "research_collection": "research-sessions"
     },
     "settings": {
       "max_report_update_size": 800,
-      "max_search_results_per_query": 5,
       "min_sources": 2,
       "max_sources": 20,
       "timeout_seconds": 600

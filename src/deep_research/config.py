@@ -4,47 +4,60 @@ Configuration is loaded from configs/config.json via Workflows ResourceConfig.
 
 This project intentionally focuses on Deep Research planning/execution only.
 """
-
-from typing import Literal
-
-from pydantic import BaseModel
-
-
-RESEARCH_SESSIONS_COLLECTION: str = "research-sessions"
+from pydantic import BaseModel, Field
 
 
 class ResearchCollections(BaseModel):
     """Agent Data collections used by the Deep Research experience."""
 
-    research_collection: str = RESEARCH_SESSIONS_COLLECTION
+    research_collection: str = Field(..., description="Agent Data collection name for research sessions")
 
 
 class ResearchSettings(BaseModel):
     """Runtime settings for deep research planning/execution."""
 
-    max_report_update_size: int = 800
-    max_search_results_per_query: int = 5
-    min_sources: int = 2
-    max_sources: int = 20
-    timeout_seconds: int = 600
+    max_report_update_size: int = Field(..., ge=1)
+    min_sources: int = Field(..., ge=1)
+    max_sources: int = Field(..., ge=1)
+    timeout_seconds: int = Field(..., ge=1)
 
 
-class LLMConfig(BaseModel):
-    """LLM configuration for the planner agent.
+class LLMModelConfig(BaseModel):
+    """Atomic configuration for a single LLM instance."""
+    model: str = Field(..., description="Google GenAI model name")
+    temperature: float = Field(..., ge=0.0, le=2.0)
 
-    This is intentionally minimal; the concrete provider/model mapping
-    can be extended as we iterate.
-    """
 
-    provider: Literal["openai", "gemini"] = "openai"
-    model: str = "gpt-5"
-    temperature: float = 0.2
-    reasoning_effort: Literal["low", "medium", "high"] = "low"
+class PlannerConfig(BaseModel):
+    main_llm: LLMModelConfig
 
+class SearcherConfig(BaseModel):
+    main_llm: LLMModelConfig
+    weak_llm: LLMModelConfig
+
+    max_results_per_query: int = Field(
+        ...,
+        ge=1,
+        description="Maximum number of SERP results to return/process for a single search query.",
+    )
+
+class OrchestratorConfig(BaseModel):
+    main_llm: LLMModelConfig
+
+class WriterConfig(BaseModel):
+    main_llm: LLMModelConfig
+
+class ReviewerConfig(BaseModel):
+    main_llm: LLMModelConfig
 
 class ResearchConfig(BaseModel):
     """Deep research configuration loaded from configs/config.json (path: research)."""
 
-    llm: LLMConfig = LLMConfig()
-    collections: ResearchCollections = ResearchCollections()
-    settings: ResearchSettings = ResearchSettings()
+    planner: PlannerConfig
+    searcher: SearcherConfig
+    orchestrator: OrchestratorConfig
+    writer: WriterConfig
+    reviewer: ReviewerConfig
+
+    collections: ResearchCollections
+    settings: ResearchSettings
