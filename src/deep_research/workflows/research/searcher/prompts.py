@@ -39,7 +39,7 @@ def build_research_system_prompt(config: ResearchConfig) -> str:
     """Assembles and formats the complete system prompt."""
     
     min_sources = config.settings.min_sources
-    max_sources = config.settings.max_sources or 10
+    max_sources = config.settings.max_sources
     
     current_date_str = date.today().isoformat()
 
