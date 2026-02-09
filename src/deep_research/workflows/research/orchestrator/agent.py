@@ -1,19 +1,20 @@
 import re
-from llama_index.core.agent.workflow import FunctionAgent
-from llama_index.core.tools import FunctionTool
-from llama_index.core.workflow import Context
-from llama_index.llms.google_genai import GoogleGenAI
 
+from llama_index.core.agent.workflow import FunctionAgent
+from llama_index.core.workflow import Context, StartEvent, StopEvent, step, Workflow
+from llama_index.core.tools import FunctionTool
 from deep_research.config import ResearchConfig
 from deep_research.utils import load_config_from_json
+from llama_index.llms.google_genai import GoogleGenAI
 
 from deep_research.workflows.research.state_keys import (
     OrchestratorStateKey,
+    StateNamespace,
     ReportStateKey,
     ReportStatus,
     ResearchStateKey,
-    StateNamespace,
 )
+from deep_research.workflows.research.orchestrator.prompts import build_orchestrator_system_prompt
 
 from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
 from deep_research.workflows.research.writer.agent import workflow as writer_agent
@@ -78,17 +79,14 @@ async def call_write_agent(ctx: Context, instruction: str) -> str:
     return "Report updated."
 
 
-async def call_review_agent(ctx: Context) -> str:
-    print(f"Orchestrator -> ReviewAgent")
-
+async def call_review_agent(ctx: Context, instructions: str = "Review the report") -> str:
+    print(f"Orchestrator -> ReviewAgent: {instructions}")
+    
     state = await ctx.store.get_state()
     report = state[StateNamespace.REPORT][ReportStateKey.CONTENT]
 
-    if not report:
-        return "No report content to review."
-
     result = await reviewer_agent.run(
-        user_msg=f"Review the following report: {report}",
+        user_msg=f"{instructions}\n\nReport Content:\n{report}",
         ctx=ctx,
     )
 
@@ -99,39 +97,53 @@ async def call_review_agent(ctx: Context) -> str:
     return str(result.response)
 
 
-workflow = FunctionAgent(
-    name="Orchestrator",
-    description="Manages the report generation process.",
-    system_prompt=(
-        "You are an expert in the field of report writing. "
-        "You are given a user request and a list of tools that can help with the request. "
-        "You are to orchestrate the tools to research, write, and review a report on the given topic. "
-        "Once the review is positive, you should notify the user that the report is ready to be accessed."
-    ),
-    llm=llm,
-    tools=[
-        FunctionTool.from_defaults(fn=call_research_agent),
-        FunctionTool.from_defaults(fn=call_write_agent),
-        FunctionTool.from_defaults(fn=call_review_agent),
-    ],
-    initial_state={
-        StateNamespace.ORCHESTRATOR: {
-            OrchestratorStateKey.RESEARCH_NOTES: [],
-            OrchestratorStateKey.REVIEW: None,
-        },
-        StateNamespace.RESEARCH: {
-            ResearchStateKey.SEEN_URLS: [],
-            ResearchStateKey.PENDING_EVIDENCE: {
-                "queries": [],
-                "directive": "",
-                "items": [],
-            },
-            ResearchStateKey.FOLLOW_UP_QUERIES: [],
-        },
-        StateNamespace.REPORT: {
-            ReportStateKey.PATH: "artifacts/report.md",
-            ReportStateKey.CONTENT: "",
-            ReportStateKey.STATUS: ReportStatus.RUNNING,
-        },
-    },
-)
+research_tool = FunctionTool.from_defaults(fn=call_research_agent)
+write_tool = FunctionTool.from_defaults(fn=call_write_agent)
+review_tool = FunctionTool.from_defaults(fn=call_review_agent)
+
+class OrchestratorWorkflow(Workflow):
+    """
+    Wrapper workflow that constructs a fresh Orchestrator Agent for each run,
+    injecting the current state (Report + Evidence) into the system prompt.
+    """
+    
+    @step
+    async def run_orchestrator(self, ev: StartEvent, ctx: Context) -> StopEvent:
+        async with ctx.store.edit_state() as state:
+            if StateNamespace.ORCHESTRATOR not in state:
+                state[StateNamespace.ORCHESTRATOR] = {
+                    OrchestratorStateKey.RESEARCH_NOTES: [],
+                    OrchestratorStateKey.REVIEW: None,
+                }
+            if StateNamespace.RESEARCH not in state:
+                state[StateNamespace.RESEARCH] = {
+                    ResearchStateKey.SEEN_URLS: [],
+                    ResearchStateKey.PENDING_EVIDENCE: {
+                        "queries": [],
+                        "directive": "",
+                        "items": [],
+                    },
+                    ResearchStateKey.FOLLOW_UP_QUERIES: [],
+                }
+            if StateNamespace.REPORT not in state:
+                state[StateNamespace.REPORT] = {
+                    ReportStateKey.PATH: "artifacts/report.md",
+                    ReportStateKey.CONTENT: "",
+                    ReportStateKey.STATUS: ReportStatus.RUNNING,
+                }
+
+        state = await ctx.store.get_state()
+        dynamic_system_prompt = build_orchestrator_system_prompt(state)
+        
+        agent = FunctionAgent(
+            name="Orchestrator",
+            description="Manages the report generation process.",
+            system_prompt=dynamic_system_prompt,
+            llm=llm,
+            tools=[research_tool, write_tool, review_tool],
+        )
+        
+        result = await agent.run(user_msg=str(ev.user_msg or "Proceed with the next step."))
+        return StopEvent(result=result)
+
+workflow = OrchestratorWorkflow(timeout=None)
