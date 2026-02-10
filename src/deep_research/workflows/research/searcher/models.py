@@ -25,7 +25,6 @@ class EvidenceItem(BaseModel):
 
 class EvidenceBundle(BaseModel):
     queries: list[str] = Field(default_factory=list)
-    directive: str
     items: list[EvidenceItem] = Field(default_factory=list)
 
     def get_summary(self) -> str:

@@ -162,23 +162,7 @@ class SearcherTools(BaseToolSpec):
             pending_raw_edit = research_state[ResearchStateKey.PENDING_EVIDENCE]
             pending_edit = EvidenceBundle.model_validate(pending_raw_edit)
 
-            if directive:
-                pending_edit.directive = directive
-
-            by_url = {i.url: i for i in pending_edit.items}
-            for item in new_items:
-                if item.url in by_url:
-                    cur = by_url[item.url]
-                    cur.relevance = max(cur.relevance, item.relevance)
-                    cur.summary = item.summary or cur.summary
-                    if item.topics:
-                        cur.topics = list(dict.fromkeys(cur.topics + item.topics))
-                    cur.assets.extend(item.assets)
-                    cur.content = item.content or cur.content
-                else:
-                    by_url[item.url] = item
-
-            pending_edit.items = list(by_url.values())
+            pending_edit.items.extend(new_items)
             research_state[ResearchStateKey.PENDING_EVIDENCE] = pending_edit.model_dump()
 
         all_summaries = []

@@ -40,7 +40,6 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
             ResearchStateKey.FAILED_URLS: [],
             ResearchStateKey.PENDING_EVIDENCE: {
                 "queries": [],
-                "directive": "",
                 "items": [],
             },
             ResearchStateKey.FOLLOW_UP_QUERIES: [],
@@ -154,7 +153,6 @@ class OrchestratorWorkflow(Workflow):
                     ResearchStateKey.FAILED_URLS: [],
                     ResearchStateKey.PENDING_EVIDENCE: {
                         "queries": [],
-                        "directive": "",
                         "items": [],
                     },
                     ResearchStateKey.FOLLOW_UP_QUERIES: [],
