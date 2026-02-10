@@ -151,7 +151,6 @@ class EvidenceService:
                 title=evidence.metadata.get("title"),
                 content=evidence.markdown,
                 summary=summary,
-                topics=[],
                 relevance=relevance,
                 assets=selected_assets,
             )

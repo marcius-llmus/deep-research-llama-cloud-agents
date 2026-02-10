@@ -9,10 +9,6 @@ class EvidenceItem(BaseModel):
         default="",
         description="Cheap-LLM summary used by orchestrator to avoid reading raw content.",
     )
-    topics: list[str] = Field(
-        default_factory=list,
-        description="Topic tags for routing/decision-making.",
-    )
     content: str = Field(default="", description="Full raw text content of the source.")
     relevance: float = Field(
         0.0,
