@@ -110,20 +110,23 @@ class SearcherTools(BaseToolSpec):
             return "No results found for this query."
 
         formatted_results: list[str] = []
-        for i, item in enumerate(search_data, 1):
+
+        for idx, item in enumerate(search_data, 1):
             title = item.get("title", "")
             url = item.get("url", "")
             snippet = item.get("desc", "") or item.get("snippet", "")
 
-            marker = ""
-            if url in seen_urls:
-                marker = " (already seen)"
-            elif url in failed_urls:
-                marker = " (previously failed to load)"
+            is_ignored = url in seen_urls or url in failed_urls
+            url_line = f"    URL: {url}"
+            if is_ignored:
+                url_line += " (already seen/failed - ignore)"
 
             formatted_results.append(
-                f"[{i}] Title: {title}\n    URL: {url}{marker}\n    Snippet: {snippet}"
+                f"[{idx}] Title: {title}\n{url_line}\n    Snippet: {snippet}"
             )
+
+        if not formatted_results:
+            return f"No results found for query: {query!r}."
 
         return "\n\n".join(formatted_results)
 
