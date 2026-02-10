@@ -21,10 +21,6 @@ class ResearchStateKey(StrEnum):
 
 
 class ReportStateKey(StrEnum):
-    CURRENT_QUERY = "current_query"
-
-
-class ReportStateKey(StrEnum):
     PATH = "path"
     CONTENT = "content"
     STATUS = "status"
