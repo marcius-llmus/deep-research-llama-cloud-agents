@@ -3,7 +3,7 @@ import asyncio
 from typing import List, Tuple
 
 from deep_research.clients import get_llama_cloud_client
-from deep_research.services.models import RichEvidence, EvidenceAsset
+from deep_research.services.models import ParsedDocument, EvidenceAsset
 
 from llama_cloud.types.parsing_get_response import ParsingGetResponse
 
@@ -12,24 +12,24 @@ logger = logging.getLogger(__name__)
 
 class DocumentParserService:
     """
-    Uses LlamaParse v2 to parse documents (HTML, PDF, etc.) into RichEvidence.
+    Uses LlamaParse v2 to parse documents (HTML, PDF, etc.) into ParsedDocument.
     """
 
     def __init__(self):
         self.client = get_llama_cloud_client()
 
-    async def parse_files(self, files: List[Tuple[str, str]]) -> tuple[List[RichEvidence], List[str]]:
+    async def parse_files(self, files: List[Tuple[str, str]]) -> tuple[List[ParsedDocument], List[str]]:
         """Parse a list of (file_id, source_url) tuples using LlamaParse v2.
 
         Returns a tuple of:
-        - parsed RichEvidence objects
+        - parsed ParsedDocument objects
         - failed URLs (only those that truly failed upload/parse)
         """
 
         tasks = [self._parse_single(url=url, file_id=file_id) for file_id, url in files]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        valid_results: list[RichEvidence] = []
+        valid_results: list[ParsedDocument] = []
         failed_urls: list[str] = []
 
         for (file_id, url), res in zip(files, results):
@@ -41,7 +41,7 @@ class DocumentParserService:
 
         return valid_results, sorted(failed_urls)
 
-    async def _parse_single(self, *, url: str, file_id: str) -> RichEvidence:
+    async def _parse_single(self, *, url: str, file_id: str) -> ParsedDocument:
         logger.info("Parsing file_id=%s (source url=%s)", file_id, url)
 
         parse_kwargs = {
@@ -101,7 +101,7 @@ class DocumentParserService:
 
         metadata = job.metadata.model_dump() if job.metadata else {}
 
-        return RichEvidence(
+        return ParsedDocument(
             source_url=url,
             markdown=markdown_content,
             structured_items=structured_items,

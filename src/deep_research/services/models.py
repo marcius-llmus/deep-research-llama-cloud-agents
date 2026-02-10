@@ -12,8 +12,8 @@ class EvidenceAsset(BaseModel):
     is_selected: bool = False
 
 
-class RichEvidence(BaseModel):
-    """A fully parsed document with text and extracted assets."""
+class ParsedDocument(BaseModel):
+    """A parsed document snapshot normalized from the upstream parser response."""
     source_url: str
     markdown: str
     structured_items: List[dict] = Field(default_factory=list)

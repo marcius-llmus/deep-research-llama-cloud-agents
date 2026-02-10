@@ -8,7 +8,7 @@ from deep_research.services.content_analysis_service import ContentAnalysisServi
 from deep_research.services.document_parser_service import DocumentParserService
 from deep_research.services.file_service import FileService
 from deep_research.services.web_search_service import WebSearchService
-from deep_research.services.models import RichEvidence
+from deep_research.services.models import ParsedDocument
 from deep_research.services.token_counting_service import TokenCountingService
 from deep_research.workflows.research.searcher.models import EvidenceItem
 
@@ -119,10 +119,10 @@ class EvidenceService:
         return items, sorted(failures), budget_exhausted
 
     async def _process_evidence(
-        self, evidence: RichEvidence, directive: str
+        self, evidence: ParsedDocument, directive: str
     ) -> Tuple[str, Optional[EvidenceItem], Optional[BaseException]]:
         """
-        Analyzes a single RichEvidence item.
+        Analyzes a single ParsedDocument item.
         Returns (url, item, error) to ensure the caller knows which URL failed.
         """
         try:
