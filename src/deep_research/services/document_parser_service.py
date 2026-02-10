@@ -164,19 +164,22 @@ class DocumentParserService:
         }
         output_options: OutputOptions = {"images_to_save": ["embedded"], "markdown": markdown_options}
 
-        job = await self.client.parsing.parse(
-            file_id=file_id,
-            tier="cost_effective",
-            version="latest",
-            input_options=input_options,
-            output_options=output_options,
-            expand=[
+        parse_kwargs = {
+            "file_id": file_id,
+            "tier": "cost_effective",
+            "version": "latest",
+            "output_options": output_options,
+            "expand": [
                 "markdown_full",
                 "items",
                 "images_content_metadata",
                 "metadata",
             ],
-        )
+        }
+        if input_options is not None:
+            parse_kwargs["input_options"] = input_options
+
+        job = await self.client.parsing.parse(**parse_kwargs)
 
         assets = []
         if job.images_content_metadata:
