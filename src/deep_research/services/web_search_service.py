@@ -1,13 +1,16 @@
 import logging
 import os
-from typing import List, Dict, Any, Tuple
+from typing import Dict, List, Tuple
 
+import asyncio
+import base64
+import json
+
+import requests
 from llama_index.readers.oxylabs import OxylabsGoogleSearchReader
 from llama_index.readers.web import OxylabsWebReader
 
 logger = logging.getLogger(__name__)
-
-MAX_PAGES_CAP = 2
 
 
 class WebSearchService:
@@ -21,18 +24,15 @@ class WebSearchService:
                 "Oxylabs credentials are required. Set OXYLABS_USERNAME and OXYLABS_PASSWORD."
             )
 
-    async def perform_search(self, query: str, pages: int = 1) -> Any:
-        """Performs a Google search and returns the raw search data object."""
-        logger.info(f"Performing Google search for query: '{query}' on {pages} page(s).")
-        search_reader = OxylabsGoogleSearchReader(username=self._username, password=self._password)
-        return await search_reader.aget_response({'query': query, 'pages': pages, 'parse': True})
-
     async def search_google(self, query: str, max_results: int = 10) -> Tuple[List[Dict], int]:
         """
         Performs a Google search and returns a list of organic result dictionaries.
         Optimized for agents.
         """
-        search_data = await self.perform_search(query, pages=1)
+        _MAX_PAGES = 1
+        search_reader = OxylabsGoogleSearchReader(username=self._username, password=self._password)
+        search_data = await search_reader.aget_response({'query': query, 'pages': _MAX_PAGES, 'parse': True})
+
         requests_made = 1
 
         collected_results: List[Dict] = []
@@ -46,14 +46,10 @@ class WebSearchService:
         Reads the content of multiple URLs concurrently.
         """
         if not urls:
-            return {}
+            raise ValueError("urls must not be empty")
 
         reader = OxylabsWebReader(username=self._username, password=self._password)
-        try:
-            documents = await reader.aload_data(urls=urls, additional_params={"markdown": True})
-        except Exception as e:
-            logger.error("WebSearchService failed to read URLs", exc_info=e)
-            return {}
+        documents = await reader.aload_data(urls=urls, additional_params={"markdown": True})
 
         content_map: Dict[str, str] = {}
         for doc in documents:
@@ -63,3 +59,28 @@ class WebSearchService:
                 content_map[url] = text
 
         return content_map
+
+    async def download_url_bytes(self, url: str) -> bytes:
+        """Download raw bytes for a URL."""
+
+        if not url:
+            raise ValueError("url is required")
+
+        api_url = f"https://{self._username}:{self._password}@realtime.oxylabs.io/v1/queries"
+        parameters = {
+            "source": "universal",
+            "url": url,
+            "content_encoding": "base64",
+        }
+
+        def _request() -> bytes:
+            response = requests.post(api_url, json=parameters, timeout=60.0)
+            if not response.ok:
+                raise RuntimeError(
+                    f"Oxylabs request failed: status={response.status_code} body={response.text}"
+                )
+            data = json.loads(response.text)
+            content_base64 = data["results"][0]["content"]
+            return base64.b64decode(content_base64)
+
+        return await asyncio.to_thread(_request)

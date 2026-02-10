@@ -25,8 +25,8 @@ llm = GoogleGenAI(
     temperature=searcher_cfg.main_llm.temperature
 )
 
-document_parser_service = DocumentParserService()
 web_search_service = WebSearchService()
+document_parser_service = DocumentParserService(web_search_service=web_search_service)
 
 query_service = QueryService(llm_config=searcher_cfg.main_llm)
 content_analysis_service = ContentAnalysisService(llm_config=searcher_cfg.weak_llm)

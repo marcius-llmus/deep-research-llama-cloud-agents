@@ -1,11 +1,9 @@
 import logging
-from typing import List, Dict, Any
-
 from llama_index.core import PromptTemplate
 from llama_index.llms.google_genai import GoogleGenAI
 
 from deep_research.config import LLMModelConfig
-from deep_research.services.models import InsightExtractionResponse
+from deep_research.services.models import InsightExtractionResponse, RichEvidence
 from deep_research.services.prompts import EXTRACT_INSIGHTS_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -22,18 +20,23 @@ class ContentAnalysisService:
             temperature=llm_config.temperature
         )
 
-    async def extract_insights_from_content(self, content: str, directive: str) -> List[Dict[str, Any]]:
+    async def analyze_rich_evidence(self, evidence: RichEvidence, directive: str) -> InsightExtractionResponse:
         """
-        Uses a weak LLM to extract key insights from content based on a directive.
+        Uses a weak LLM to extract key insights and select relevant assets from content.
         """
         prompt_template = PromptTemplate(template=EXTRACT_INSIGHTS_PROMPT)
+        
+        assets_list_str = "\n".join([f"- ID: {a.id} | Type: {a.type} | URL: {a.url}" for a in evidence.assets])
+        if not assets_list_str:
+            assets_list_str = "(No assets found)"
+
         structured_response = await self.llm.astructured_predict(
             InsightExtractionResponse,
             prompt=prompt_template,
             directive=directive,
-            content=content
+            content=evidence.markdown[:200000],
+            assets_list=assets_list_str
         )
 
-        insights = [insight.model_dump() for insight in structured_response.insights]
-        logger.info(f"Extracted {len(insights)} insights for directive: '{directive[:50]}...'")
-        return insights
+        logger.info(f"Extracted {len(structured_response.insights)} insights and selected {len(structured_response.selected_asset_ids)} assets for {evidence.source_url}")
+        return structured_response

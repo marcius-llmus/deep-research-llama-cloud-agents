@@ -1,10 +1,11 @@
 import logging
 import asyncio
-from typing import List, Dict, Tuple, Optional, Any
+from typing import List, Tuple, Optional
 
 from deep_research.services.content_analysis_service import ContentAnalysisService
 from deep_research.services.document_parser_service import DocumentParserService
 from deep_research.workflows.research.searcher.models import EvidenceItem
+from deep_research.services.models import RichEvidence
 
 logger = logging.getLogger(__name__)
 
@@ -27,72 +28,79 @@ class EvidenceService:
 
     async def generate_evidence(
         self,
-        content_map: Dict[str, str],
+        urls: List[str],
         directive: str
     ) -> Tuple[List[EvidenceItem], List[str]]:
         """
-        Parses and analyzes raw content to produce enriched EvidenceItems.
+        Parses and analyzes URLs to produce enriched EvidenceItems.
         Returns (items, failures).
         """
-        tasks = []
-        urls = list(content_map.keys())
+        rich_evidences = await self.document_parser_service.parse_urls(urls)
 
-        for url in urls:
-            raw_text = content_map[url]
-            tasks.append(self._process_url(url, raw_text, directive))
-
+        tasks = [self._process_evidence(evidence, directive) for evidence in rich_evidences]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         items: List[EvidenceItem] = []
-        failures: List[str] = []
+        failures: set[str] = set(urls)
 
-        for url, result in zip(urls, results):
+        for result in results:
             if isinstance(result, EvidenceItem):
                 items.append(result)
+                failures.discard(result.url)
             elif result is None:
-                failures.append(url)
-            else:
-                logger.error(f"Error processing {url}: {result}")
-                failures.append(url)
+                continue
+            elif isinstance(result, Exception):
+                logger.error("Error processing evidence", exc_info=result)
 
-        return items, failures
+        return items, sorted(failures)
 
-    async def _process_url(
+    async def _process_evidence(
         self,
-        url: str,
-        raw_text: str,
+        evidence: RichEvidence,
         directive: str
     ) -> Optional[EvidenceItem]:
-        """Process a single URL: parse -> enrich -> return item."""
-        doc = await self.document_parser_service.parse_stub(source=url, text=raw_text)
+        """Process a single RichEvidence: analyze -> return item."""
 
-        if not doc.text or not doc.text.strip():
-            logger.warning(f"Failed to parse content from {url}")
+        markdown = (evidence.markdown or "").strip()
+        if not markdown:
             return None
 
-        insights = await self.content_analysis_service.extract_insights_from_content(
-            content=doc.text,
+        analysis_result = await self.content_analysis_service.analyze_rich_evidence(
+            evidence=RichEvidence(
+                source_url=evidence.source_url,
+                content_type=evidence.content_type,
+                markdown=markdown,
+                structured_items=evidence.structured_items,
+                assets=evidence.assets,
+                metadata=evidence.metadata,
+            ),
             directive=directive,
         )
 
-        if not insights:
-            logger.info(f"No useful metadata extracted for {doc.source}")
+        if not analysis_result.insights:
             return None
 
-        summary_lines = [f"- {insight['content']} (Relevance: {insight['relevance_score']:.2f})" for insight in insights]
+        summary_lines = [f"- {insight.content} (Relevance: {insight.relevance_score:.2f})" for insight in analysis_result.insights]
         summary = "\n".join(summary_lines)
 
-        bullets = [insight['content'] for insight in insights]
+        bullets = [insight.content for insight in analysis_result.insights]
 
-        relevance = max((insight['relevance_score'] for insight in insights), default=0.0)
+        relevance = max((insight.relevance_score for insight in analysis_result.insights), default=0.0)
+
+        selected_assets = []
+        for asset in evidence.assets:
+            if asset.id in analysis_result.selected_asset_ids:
+                asset.is_selected = True
+                selected_assets.append(asset)
 
         return EvidenceItem(
-            url=doc.source,
-            title=doc.title,
-            content_type=doc.content_type,
-            content=doc.text,
+            url=evidence.source_url,
+            title=evidence.metadata.get("title"),
+            content_type=evidence.content_type,
+            content=evidence.markdown,
             summary=summary,
             topics=[],
             bullets=bullets,
             relevance=relevance,
+            assets=selected_assets
         )

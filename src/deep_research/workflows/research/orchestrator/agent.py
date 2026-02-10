@@ -64,7 +64,12 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
             url = item.get("url", "unknown")
             summary = item.get("summary", "No summary")
             relevance = item.get("relevance", 0.0)
+            assets = item.get("assets", [])
             evidence_lines.append(f"- [{relevance:.2f}] {url}: {summary}")
+            if assets:
+                evidence_lines.append(f"  Assets ({len(assets)}):")
+                for asset in assets:
+                    evidence_lines.append(f"    - [{asset.get('type', 'unknown')}] {asset.get('description', 'No desc')} (ID: {asset.get('id')}) -> {asset.get('url')}")
             
         evidence_text = "\n".join(evidence_lines) if evidence_lines else "No evidence gathered."
         
@@ -146,14 +151,15 @@ class OrchestratorWorkflow(Workflow):
             if StateNamespace.RESEARCH not in state:
                 state[StateNamespace.RESEARCH] = {
                     ResearchStateKey.SEEN_URLS: [],
+                    ResearchStateKey.FAILED_URLS: [],
                     ResearchStateKey.PENDING_EVIDENCE: {
                         "queries": [],
                         "directive": "",
-                "items": [],
-            },
-            ResearchStateKey.FOLLOW_UP_QUERIES: [],
-            ResearchStateKey.CURRENT_QUERY: prompt,
-        }
+                        "items": [],
+                    },
+                    ResearchStateKey.FOLLOW_UP_QUERIES: [],
+                    ResearchStateKey.CURRENT_QUERY: "",
+                }
             if StateNamespace.REPORT not in state:
                 state[StateNamespace.REPORT] = {
                     ReportStateKey.PATH: "artifacts/report.md",

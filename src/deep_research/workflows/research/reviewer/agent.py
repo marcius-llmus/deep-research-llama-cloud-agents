@@ -3,6 +3,7 @@ from llama_index.llms.google_genai import GoogleGenAI
 from deep_research.config import ResearchConfig
 from deep_research.utils import load_config_from_json
 
+
 cfg = load_config_from_json(
     model=ResearchConfig,
     config_file="configs/config.json",

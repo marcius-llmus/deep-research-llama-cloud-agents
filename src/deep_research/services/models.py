@@ -1,6 +1,25 @@
-from typing import List
+from typing import List, Literal, Any
 
 from pydantic import BaseModel, Field
+
+
+class EvidenceAsset(BaseModel):
+    """A binary asset extracted from the document (Image, Chart, Spreadsheet)."""
+    id: str = Field(..., description="Unique ID or filename of the asset")
+    type: Literal["image", "table_csv", "downloadable_file", "unknown"]
+    url: str = Field(..., description="The presigned URL or source URL")
+    description: str | None = None
+    is_selected: bool = False
+
+
+class RichEvidence(BaseModel):
+    """A fully parsed document with text and extracted assets."""
+    source_url: str
+    content_type: str = "unknown"
+    markdown: str
+    structured_items: List[dict] = Field(default_factory=list)
+    assets: List[EvidenceAsset] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExtractedInsight(BaseModel):
@@ -11,6 +30,7 @@ class ExtractedInsight(BaseModel):
 class InsightExtractionResponse(BaseModel):
     """Structured response for insight extraction."""
     insights: List[ExtractedInsight] = Field(..., description="List of key insights extracted from the content.")
+    selected_asset_ids: List[str] = Field(default_factory=list, description="List of asset IDs that are relevant to the directive.")
 
 class FollowUpQueryResponse(BaseModel):
     """Structured response for follow-up query generation."""
@@ -44,16 +64,3 @@ class DecomposedQueryResponse(BaseModel):
         """Convenience accessor for newline-joined queries."""
 
         return self.format_queries(sep="\n")
-
-
-class ParsedDocument(BaseModel):
-    """Normalized, cleaned document content suitable for cheap LLM enrichment.
-
-    This is intentionally lightweight and mock-friendly.
-    """
-
-    source: str
-    content_type: str  # "html" | "pdf" | "csv" | "unknown"
-    text: str
-    title: str | None = None
-    parse_notes: str | None = None

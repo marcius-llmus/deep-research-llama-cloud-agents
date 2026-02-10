@@ -107,8 +107,7 @@ class SearcherTools(BaseToolSpec):
         Reads content from a list of URLs in parallel, analyzes each for insights relevant to a directive,
         and returns a concise summary for each.
         """
-        content_map = await self.web_search_service.read_multiple_pages_content(urls)
-        new_items, failures = await self.evidence_service.generate_evidence(content_map, directive)
+        new_items, failures = await self.evidence_service.generate_evidence(urls, directive)
 
         async with ctx.store.edit_state() as st:
             research_state = st[StateNamespace.RESEARCH]
@@ -139,6 +138,7 @@ class SearcherTools(BaseToolSpec):
                     cur.content_type = item.content_type or cur.content_type
                     if item.topics:
                         cur.topics = list(dict.fromkeys(cur.topics + item.topics))
+                    cur.assets.extend(item.assets)
                 else:
                     by_url[item.url] = item
 
@@ -151,6 +151,10 @@ class SearcherTools(BaseToolSpec):
             if item.bullets:
                 bullets_text = "\n".join([f"- {b}" for b in item.bullets])
                 summary_text += f"\n\nKey Insights:\n{bullets_text}"
+            
+            if item.assets:
+                assets_text = "\n".join([f"- [{a.type}] {a.id}: {a.url}" for a in item.assets])
+                summary_text += f"\n\nSelected Assets:\n{assets_text}"
 
             all_summaries.append(f"--- Analysis for {item.url} ---\n{summary_text}")
 
