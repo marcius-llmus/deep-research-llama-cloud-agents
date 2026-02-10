@@ -6,6 +6,7 @@ from deep_research.workflows.research.searcher.prompts import build_research_sys
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.document_parser_service import DocumentParserService
+from deep_research.services.file_service import FileService
 from deep_research.services.query_service import QueryService
 from deep_research.services.content_analysis_service import ContentAnalysisService
 from llama_index.llms.google_genai import GoogleGenAI
@@ -26,7 +27,8 @@ llm = GoogleGenAI(
 )
 
 web_search_service = WebSearchService()
-document_parser_service = DocumentParserService(web_search_service=web_search_service)
+file_service = FileService()
+document_parser_service = DocumentParserService()
 
 query_service = QueryService(llm_config=searcher_cfg.main_llm)
 content_analysis_service = ContentAnalysisService(llm_config=searcher_cfg.weak_llm)
@@ -34,6 +36,8 @@ content_analysis_service = ContentAnalysisService(llm_config=searcher_cfg.weak_l
 evidence_service = EvidenceService(
     content_analysis_service=content_analysis_service,
     document_parser_service=document_parser_service,
+    file_service=file_service,
+    web_search_service=web_search_service,
 )
 
 tools_spec = SearcherTools(
