@@ -51,13 +51,14 @@ class SearcherTools(BaseToolSpec):
 
     async def optimized_query_generator(
         self,
-        query: Annotated[str, Field(description="User query to rewrite for better web search.")],
+        query: Annotated[str, Field(description="User query to decompose into web search queries.")],
     ) -> str:
         """
-        Refines a research topic into an optimized query suitable for a web search engine.
-        Use this at the beginning of your research.
+        Decomposes a research topic into one or more focused web search queries.
+        Use this at the beginning of your research when the prompt includes multiple asks.
         """
-        return await self.query_service.generate_optimized_query(query=query)
+        decomposed = await self.query_service.generate_optimized_query(query=query)
+        return decomposed.formatted or "Could not generate queries"
 
     async def web_search(
         self,

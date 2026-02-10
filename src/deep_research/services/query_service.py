@@ -6,7 +6,7 @@ from llama_index.core import PromptTemplate
 from llama_index.llms.google_genai import GoogleGenAI
 
 from deep_research.config import LLMModelConfig
-from deep_research.services.models import FollowUpQueryResponse
+from deep_research.services.models import DecomposedQueryResponse, FollowUpQueryResponse
 from deep_research.services.prompts import (
     OPTIMIZE_QUERY_INSTRUCTION,
     GENERATE_FOLLOW_UPS_PROMPT,
@@ -28,15 +28,20 @@ class QueryService:
             temperature=llm_config.temperature
         )
 
-    async def generate_optimized_query(self, query: str) -> str:
+    async def generate_optimized_query(self, query: str) -> DecomposedQueryResponse:
         """
-        Takes a user query and uses a powerful LLM to rewrite it for optimal web search results.
+        Decomposes a user request into one or more focused web search queries.
+
+        Note: despite the method name, this returns a structured response containing
+        one or more decomposed queries.
         """
         prompt_template = PromptTemplate(template=OPTIMIZE_QUERY_INSTRUCTION)
-        response = await self.llm.acomplete(prompt_template.format(query=query))
-        optimized_query = response.text.strip()
-        logger.info(f"Optimized query '{query}' to '{optimized_query}'")
-        return optimized_query
+        structured_response = await self.llm.astructured_predict(
+            DecomposedQueryResponse,
+            prompt=prompt_template,
+            query=query,
+        )
+        return structured_response
 
     async def generate_follow_up_queries(self, insights: List[str], original_query: str) -> List[str]:
         """

@@ -13,7 +13,15 @@ You must adhere to the following constraints for the entire duration of your res
 GUARDRAILS_SECTION_TMPL = """\
 ## Behavioral Guardrails
 
-    To ensure efficient research, you must also adhere to these rules:
+To ensure efficient research, you must also adhere to these rules:
+
+### Query handling (CRITICAL)
+- **Do not rewrite queries:** You MUST NOT add constraints that the user did not explicitly ask for.
+  - Do NOT add dates/years (e.g., "February 2026"), "current", "today", "latest", or event context (e.g., "inauguration", "election") unless the user explicitly included them.
+- **Decompose before searching:** Before your FIRST `web_search` in a run, you MUST call `optimized_query_generator` with the user's original query.
+- **Use returned queries verbatim:** For subsequent `web_search` calls, copy/paste one of the returned decomposed queries EXACTLY (no rewording).
+
+### Workflow efficiency
 - **Avoid Search Loops:** After using `web_search`, prioritize reading sources with `read_and_analyze_webpages` before searching again. Do not perform more than 3 consecutive `web_search` actions.
 - **Process in Batches:** When using `read_and_analyze_webpages`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
 - **Efficient Reading:** The `web_search` tool will mark URLs with `(already seen)` when they were already processed.
