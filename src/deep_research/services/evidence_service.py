@@ -61,19 +61,8 @@ class EvidenceService:
     ) -> Optional[EvidenceItem]:
         """Process a single RichEvidence: analyze -> return item."""
 
-        markdown = (evidence.markdown or "").strip()
-        if not markdown:
-            return None
-
         analysis_result = await self.content_analysis_service.analyze_rich_evidence(
-            evidence=RichEvidence(
-                source_url=evidence.source_url,
-                content_type=evidence.content_type,
-                markdown=markdown,
-                structured_items=evidence.structured_items,
-                assets=evidence.assets,
-                metadata=evidence.metadata,
-            ),
+            evidence=evidence,
             directive=directive,
         )
 
