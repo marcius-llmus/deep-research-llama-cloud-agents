@@ -169,10 +169,8 @@ class SearcherTools(BaseToolSpec):
             for item in new_items:
                 if item.url in by_url:
                     cur = by_url[item.url]
-                    cur.bullets = list(dict.fromkeys(cur.bullets + item.bullets))
                     cur.relevance = max(cur.relevance, item.relevance)
                     cur.summary = item.summary or cur.summary
-                    cur.content_type = item.content_type or cur.content_type
                     if item.topics:
                         cur.topics = list(dict.fromkeys(cur.topics + item.topics))
                     cur.assets.extend(item.assets)
@@ -185,11 +183,8 @@ class SearcherTools(BaseToolSpec):
 
         all_summaries = []
         for item in new_items:
-            summary_text = item.summary or "No summary available."
-            if item.bullets:
-                bullets_text = "\n".join([f"- {b}" for b in item.bullets])
-                summary_text += f"\n\nKey Insights:\n{bullets_text}"
-            
+            summary_text = item.summary
+
             if item.assets:
                 assets_text = "\n".join([f"- [{a.type}] {a.id}: {a.url}" for a in item.assets])
                 summary_text += f"\n\nSelected Assets:\n{assets_text}"
@@ -251,7 +246,7 @@ class SearcherTools(BaseToolSpec):
 
         insights: list[str] = []
         for item in pending.items:
-            insights.extend(item.bullets)
+            insights.append(item.summary)
 
         queries = await self.query_service.generate_follow_up_queries(
             insights=insights,

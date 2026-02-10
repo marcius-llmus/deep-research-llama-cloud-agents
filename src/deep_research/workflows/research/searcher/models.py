@@ -5,20 +5,15 @@ from deep_research.services.models import EvidenceAsset
 class EvidenceItem(BaseModel):
     url: str
     title: str | None = None
-    content_type: str | None = Field(
-        default=None,
-        description="Normalized content type for the evidence source (html/pdf/csv/unknown).",
-    )
-    summary: str | None = Field(
-        default=None,
+    summary: str = Field(
+        default="",
         description="Cheap-LLM summary used by orchestrator to avoid reading raw content.",
     )
     topics: list[str] = Field(
         default_factory=list,
         description="Topic tags for routing/decision-making.",
     )
-    content: str = Field(..., description="Full raw text content of the source.")
-    bullets: list[str] = Field(default_factory=list)
+    content: str = Field(default="", description="Full raw text content of the source.")
     relevance: float = Field(
         0.0,
         description="Relevance score for the overall source (0.0-1.0).",
@@ -40,8 +35,7 @@ class EvidenceBundle(BaseModel):
         
         lines = [f"Gathered {len(self.items)} evidence items:"]
         for i, item in enumerate(self.items, 1):
-            summary = item.summary or "No summary available."
-            lines.append(f"{i}. [{item.content_type or 'unknown'}] {item.url}")
-            lines.append(f"   Summary: {summary}")
+            lines.append(f"{i}. {item.url}")
+            lines.append(f"   Summary: {item.summary}")
             lines.append(f"   Relevance: {item.relevance:.2f}")
         return "\n".join(lines)

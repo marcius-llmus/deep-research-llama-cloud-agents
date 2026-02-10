@@ -15,7 +15,6 @@ class EvidenceAsset(BaseModel):
 class RichEvidence(BaseModel):
     """A fully parsed document with text and extracted assets."""
     source_url: str
-    content_type: str = "unknown"
     markdown: str
     structured_items: List[dict] = Field(default_factory=list)
     assets: List[EvidenceAsset] = Field(default_factory=list)

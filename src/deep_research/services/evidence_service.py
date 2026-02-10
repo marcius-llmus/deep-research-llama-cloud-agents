@@ -96,7 +96,6 @@ class EvidenceService:
                 f"- {insight.content} (Relevance: {insight.relevance_score:.2f})"
                 for insight in analysis_result.insights
             )
-            bullets = [insight.content for insight in analysis_result.insights]
             relevance = max((i.relevance_score for i in analysis_result.insights), default=0.0)
 
             selected_assets = []
@@ -108,11 +107,9 @@ class EvidenceService:
             item = EvidenceItem(
                 url=evidence.source_url,
                 title=evidence.metadata.get("title"),
-                content_type=evidence.content_type,
                 content=evidence.markdown,
                 summary=summary,
                 topics=[],
-                bullets=bullets,
                 relevance=relevance,
                 assets=selected_assets,
             )

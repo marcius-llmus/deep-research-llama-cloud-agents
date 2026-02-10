@@ -62,7 +62,7 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
         evidence_lines = []
         for item in sorted_items:
             url = item.get("url", "unknown")
-            summary = item.get("summary", "No summary")
+            summary = item["summary"]
             relevance = item.get("relevance", 0.0)
             assets = item.get("assets", [])
             evidence_lines.append(f"- [{relevance:.2f}] {url}: {summary}")
