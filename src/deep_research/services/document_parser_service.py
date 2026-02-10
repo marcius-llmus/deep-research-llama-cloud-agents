@@ -24,16 +24,6 @@ class DocumentParserService:
         self.client = get_llama_cloud_client()
         self.web_search_service = web_search_service
 
-    def _get_suffix(self, *, url: str) -> str:
-        """Return the literal file extension from the URL path.
-
-        If the URL path has no extension, returns an empty string.
-        """
-
-        path = urlparse(url).path or ""
-        _, ext = os.path.splitext(path)
-        return ext.lower()
-
     async def upload_urls(self, urls: List[str]) -> Dict[str, str]:
         """Upload URL contents to LlamaCloud and return a url -> file_id map.
 
@@ -58,33 +48,39 @@ class DocumentParserService:
 
         return file_ids_by_url
 
-    async def parse_urls(self, urls: List[str]) -> List[RichEvidence]:
+    async def parse_urls(self, urls: List[str]) -> tuple[List[RichEvidence], List[str]]:
+        """Parse a list of URLs using LlamaParse v2.
+
+        Returns a tuple of:
+        - parsed RichEvidence objects
+        - failed URLs (only those that truly failed upload/parse)
         """
-        Parses a list of URLs using LlamaParse v2.
-        """
+
         file_ids_by_url = await self.upload_urls(urls)
+
+        failed_urls: set[str] = set(urls) - set(file_ids_by_url.keys())
+
         tasks = [self._parse_single(url=url, file_id=file_id) for url, file_id in file_ids_by_url.items()]
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        valid_results = []
+        valid_results: list[RichEvidence] = []
         for url, res in zip(list(file_ids_by_url.keys()), results):
             if isinstance(res, Exception):
-                logger.error(f"Failed to parse {url}: {res}")
-            elif res:
+                failed_urls.add(url)
+                logger.error("Failed to parse %s", url, exc_info=res)
+                continue
+            if res:
                 valid_results.append(res)
-        
-        return valid_results
+
+        return valid_results, sorted(failed_urls)
 
     async def _upload_single_binary(self, *, url: str) -> str:
         """Download raw bytes and upload as-is to LlamaCloud."""
-
-        suffix = self._get_suffix(url=url) or ""
 
         data = await self.web_search_service.download_url_bytes(url, use_render=True, timeout=10)
         if not data:
             raise ValueError(f"Empty content downloaded for {url}")
 
-        tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, delete=False)
+        tmp = tempfile.NamedTemporaryFile(mode="wb", delete=False)
         try:
             tmp.write(data)
             tmp.flush()
@@ -157,7 +153,6 @@ class DocumentParserService:
 
         return RichEvidence(
             source_url=url,
-            content_type="unknown",
             markdown=markdown_content,
             structured_items=structured_items,
             assets=assets,
