@@ -50,14 +50,14 @@ class WebSearchService:
 
         reader = OxylabsWebReader(username=self._username, password=self._password)
         try:
-            documents = await reader.aload_data(urls=urls)
+            documents = await reader.aload_data(urls=urls, additional_params={"markdown": True})
         except Exception as e:
             logger.error("WebSearchService failed to read URLs", exc_info=e)
             return {}
 
         content_map: Dict[str, str] = {}
         for doc in documents:
-            url = (doc.metadata or {}).get("url")
+            url = (doc.metadata["oxylabs_job"] or {}).get("url")
             text = (doc.text or "").strip()
             if url and text:
                 content_map[url] = text
