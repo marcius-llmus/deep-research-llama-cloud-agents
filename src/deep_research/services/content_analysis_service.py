@@ -34,7 +34,7 @@ class ContentAnalysisService:
             InsightExtractionResponse,
             prompt=prompt_template,
             directive=directive,
-            content=evidence.markdown[:200000],
+            content=evidence.markdown,
             assets_list=assets_list_str
         )
 
