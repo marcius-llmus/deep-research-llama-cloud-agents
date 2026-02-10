@@ -6,6 +6,8 @@ from typing import List, Optional, Tuple
 
 from deep_research.services.content_analysis_service import ContentAnalysisService
 from deep_research.services.document_parser_service import DocumentParserService
+from deep_research.services.file_service import FileService
+from deep_research.services.web_search_service import WebSearchService
 from deep_research.services.models import RichEvidence
 from deep_research.services.token_counting_service import TokenCountingService
 from deep_research.workflows.research.searcher.models import EvidenceItem
@@ -16,8 +18,10 @@ logger = logging.getLogger(__name__)
 class EvidenceService:
     """
     Orchestrates the evidence gathering pipeline:
-    1. Parse Content (DocumentParserService)
-    2. Enrich Content (ContentAnalysisService)
+    1. Download Content (WebSearchService)
+    2. Upload Content (FileService)
+    3. Parse Content (DocumentParserService)
+    4. Enrich Content (ContentAnalysisService)
     """
 
     def __init__(
@@ -25,9 +29,13 @@ class EvidenceService:
         *,
         content_analysis_service: ContentAnalysisService,
         document_parser_service: DocumentParserService,
+        file_service: FileService,
+        web_search_service: WebSearchService,
     ) -> None:
         self.content_analysis_service = content_analysis_service
         self.document_parser_service = document_parser_service
+        self.file_service = file_service
+        self.web_search_service = web_search_service
 
     async def generate_evidence(
         self,
@@ -41,15 +49,49 @@ class EvidenceService:
         """
         Parses and analyzes URLs to produce enriched EvidenceItems.
         Returns (items, failures, budget_exhausted).
+        This service orchestrates the evidence generation process of downloading, from web, upload to LlamaIndex and parse.
+        Btw, Llama parsing is insane. I don't know waht they do, but you send bytes, it eats the data and return structures.
         """
-        rich_evidences, parse_failures = await self.document_parser_service.parse_urls(urls)
+
+        # this is the downloading part
+        download_tasks = [self.web_search_service.download_url_bytes(url) for url in urls]
+        download_results = await asyncio.gather(*download_tasks, return_exceptions=True)
+        
+        valid_downloads: List[Tuple[str, bytes]] = []
+        failures: set[str] = set()
+
+        for url, res in zip(urls, download_results):
+            if isinstance(res, BaseException) or not res:
+                failures.add(url)
+                logger.error(f"Failed to download {url}: {res}")
+            else:
+                valid_downloads.append((url, res))
+
+        # we upload the data to llama index so we can parse by id
+        # this is also good because will allow research point to actual factual data from real docs
+        upload_tasks = [
+            self.file_service.upload_bytes(content, filename=f"upload_{hash(url)}") 
+            for url, content in valid_downloads
+        ]
+        upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
+
+        files_to_parse: List[Tuple[str, str]] = [] # (file_id, url)
+        
+        for (url, _), res in zip(valid_downloads, upload_results):
+            if isinstance(res, BaseException):
+                failures.add(url)
+                logger.error(f"Failed to upload {url}: {res}")
+            else:
+                files_to_parse.append((res, url))
+
+        rich_evidences, parse_failures = await self.document_parser_service.parse_files(files_to_parse)
+        failures.update(parse_failures)
 
         results = await asyncio.gather(
             *(self._process_evidence(e, directive) for e in rich_evidences)
         )
 
         items: List[EvidenceItem] = []
-        failures: set[str] = set(parse_failures)
         budget_exhausted = False
         total_tokens = max(0, existing_total_tokens)
 
