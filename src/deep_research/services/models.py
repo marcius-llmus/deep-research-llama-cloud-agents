@@ -3,21 +3,21 @@ from typing import List, Literal, Any
 from pydantic import BaseModel, Field
 
 
-class EvidenceAsset(BaseModel):
-    """A binary asset extracted from the document (Image, Chart, Spreadsheet)."""
+class ParsedDocumentAsset(BaseModel):
     id: str = Field(..., description="Unique ID or filename of the asset")
-    type: Literal["image", "table_csv", "downloadable_file", "unknown"]
-    url: str = Field(..., description="The presigned URL or source URL")
+    type: Literal["image", "unknown"] = "unknown"
+    url: str = Field(..., description="Presigned URL or source URL")
     description: str | None = None
     is_selected: bool = False
 
 
 class ParsedDocument(BaseModel):
     """A parsed document snapshot normalized from the upstream parser response."""
+
     source_url: str
     markdown: str
     structured_items: List[dict] = Field(default_factory=list)
-    assets: List[EvidenceAsset] = Field(default_factory=list)
+    assets: List[ParsedDocumentAsset] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -26,10 +26,12 @@ class ExtractedInsight(BaseModel):
     content: str = Field(..., description="The content of the extracted insight.")
     relevance_score: float = Field(..., description="Relevance score between 0.0 and 1.0", ge=0.0, le=1.0)
 
+
 class InsightExtractionResponse(BaseModel):
     """Structured response for insight extraction."""
     insights: List[ExtractedInsight] = Field(..., description="List of key insights extracted from the content.")
     selected_asset_ids: List[str] = Field(default_factory=list, description="List of asset IDs that are relevant to the directive.")
+
 
 class FollowUpQueryResponse(BaseModel):
     """Structured response for follow-up query generation."""

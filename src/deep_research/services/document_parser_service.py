@@ -3,7 +3,7 @@ import asyncio
 from typing import List, Tuple
 
 from deep_research.clients import get_llama_cloud_client
-from deep_research.services.models import ParsedDocument, EvidenceAsset
+from deep_research.services.models import ParsedDocument, ParsedDocumentAsset
 
 from llama_cloud.types.parsing_get_response import ParsingGetResponse
 
@@ -75,15 +75,17 @@ class DocumentParserService:
 
         job: ParsingGetResponse = await self.client.parsing.parse(**parse_kwargs)
 
-        assets = []
+        assets: list[ParsedDocumentAsset] = []
         if job.images_content_metadata:
             for img in job.images_content_metadata.images:
-                assets.append(EvidenceAsset(
-                    id=img.filename,
-                    type="image",
-                    url=img.presigned_url,
-                    description=f"Image extracted from {url}"
-                ))
+                assets.append(
+                    ParsedDocumentAsset(
+                        id=img.filename,
+                        type="image",
+                        url=img.presigned_url,
+                        description=f"Image extracted from {url}",
+                    )
+                )
 
         markdown_content = ""
         if job.markdown and job.markdown.pages:

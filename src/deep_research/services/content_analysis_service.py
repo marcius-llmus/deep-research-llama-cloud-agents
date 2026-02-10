@@ -20,7 +20,7 @@ class ContentAnalysisService:
             temperature=llm_config.temperature
         )
 
-    async def analyze_rich_evidence(self, evidence: ParsedDocument, directive: str) -> InsightExtractionResponse:
+    async def analyze_parsed_document(self, evidence: ParsedDocument, directive: str) -> InsightExtractionResponse:
         """
         Uses a weak LLM to extract key insights and select relevant assets from content.
         """
@@ -38,5 +38,10 @@ class ContentAnalysisService:
             assets_list=assets_list_str
         )
 
-        logger.info(f"Extracted {len(structured_response.insights)} insights and selected {len(structured_response.selected_asset_ids)} assets for {evidence.source_url}")
+        logger.info(
+            "Extracted %s insights and selected %s assets for %s",
+            len(structured_response.insights),
+            len(structured_response.selected_asset_ids),
+            evidence.source_url,
+        )
         return structured_response

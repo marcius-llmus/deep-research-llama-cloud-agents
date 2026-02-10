@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from deep_research.services.models import EvidenceAsset
+from deep_research.services.models import ParsedDocumentAsset
 
 
 class EvidenceItem(BaseModel):
@@ -16,7 +16,7 @@ class EvidenceItem(BaseModel):
         ge=0.0,
         le=1.0,
     )
-    assets: list[EvidenceAsset] = Field(default_factory=list, description="Selected rich assets (images, tables) from the source.")
+    assets: list[ParsedDocumentAsset] = Field(default_factory=list, description="Selected rich assets (images, tables) from the source.")
 
 
 class EvidenceBundle(BaseModel):

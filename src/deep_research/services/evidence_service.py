@@ -84,11 +84,11 @@ class EvidenceService:
             else:
                 files_to_parse.append((res, url))
 
-        rich_evidences, parse_failures = await self.document_parser_service.parse_files(files_to_parse)
+        parsed_documents, parse_failures = await self.document_parser_service.parse_files(files_to_parse)
         failures.update(parse_failures)
 
         results = await asyncio.gather(
-            *(self._process_evidence(e, directive) for e in rich_evidences)
+            *(self._process_evidence(e, directive) for e in parsed_documents)
         )
 
         items: List[EvidenceItem] = []
@@ -126,7 +126,7 @@ class EvidenceService:
         Returns (url, item, error) to ensure the caller knows which URL failed.
         """
         try:
-            analysis_result = await self.content_analysis_service.analyze_rich_evidence(
+            analysis_result = await self.content_analysis_service.analyze_parsed_document(
                 evidence=evidence,
                 directive=directive,
             )

@@ -173,7 +173,8 @@ class SearcherTools(BaseToolSpec):
             summary_text = item.summary
 
             if item.assets:
-                assets_text = "\n".join([f"- [{a.type}] {a.id}: {a.url}" for a in item.assets])
+                assets_text = "\n".join([f"- [{a.type}] {a.description or 'No desc'} (ID: {a.id}) -> {a.url}"
+                        for a in item.assets])
                 summary_text += f"\n\nSelected Assets:\n{assets_text}"
 
             all_summaries.append(f"--- Analysis for {item.url} ---\n{summary_text}")
