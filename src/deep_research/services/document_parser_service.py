@@ -1,20 +1,16 @@
 import logging
 import asyncio
 import tempfile
-from typing import List, Dict, Tuple
+import os
+from typing import List, Dict
 from urllib.parse import urlparse
 
 from deep_research.services.web_search_service import WebSearchService
 
 from deep_research.clients import get_llama_cloud_client
 from deep_research.services.models import RichEvidence, EvidenceAsset
-from llama_cloud.types.parsing_create_params import (
-    InputOptions,
-    InputOptionsHTML,
-    OutputOptions,
-    OutputOptionsMarkdown,
-    OutputOptionsMarkdownTables,
-)
+
+from llama_cloud.types.parsing_get_response import ParsingGetResponse
 
 logger = logging.getLogger(__name__)
 
@@ -28,38 +24,15 @@ class DocumentParserService:
         self.client = get_llama_cloud_client()
         self.web_search_service = web_search_service
 
-    @staticmethod
-    def _guess_suffix_and_kind(*, url: str) -> Tuple[str, str]:
-        """Best-effort guess of file suffix and high-level kind.
+    def _get_suffix(self, *, url: str) -> str:
+        """Return the literal file extension from the URL path.
 
-        Kind is used to decide whether to pass HTML input options to LlamaParse.
+        If the URL path has no extension, returns an empty string.
         """
 
-        path = (urlparse(url).path or "").lower()
-
-        if path.endswith(".pdf"):
-            return ".pdf", "pdf"
-        if path.endswith(".csv"):
-            return ".csv", "csv"
-        if path.endswith(".tsv"):
-            return ".tsv", "csv"
-        if path.endswith(".xlsx"):
-            return ".xlsx", "spreadsheet"
-        if path.endswith(".xls"):
-            return ".xls", "spreadsheet"
-
-        if path.endswith(".png"):
-            return ".png", "image"
-        if path.endswith(".jpg") or path.endswith(".jpeg"):
-            return ".jpg", "image"
-        if path.endswith(".svg"):
-            return ".svg", "image"
-        if path.endswith(".webp"):
-            return ".webp", "image"
-        if path.endswith(".gif"):
-            return ".gif", "image"
-
-        return ".bin", "binary"
+        path = urlparse(url).path or ""
+        _, ext = os.path.splitext(path)
+        return ext.lower()
 
     async def upload_urls(self, urls: List[str]) -> Dict[str, str]:
         """Upload URL contents to LlamaCloud and return a url -> file_id map.
@@ -71,15 +44,7 @@ class DocumentParserService:
         if not urls:
             return {}
 
-        text_by_url = await self.web_search_service.read_multiple_pages_content(urls)
-
-        tasks = []
-        for url in urls:
-            if url in text_by_url and (text_by_url[url] or "").strip():
-                tasks.append(self._upload_single_text(url=url, content=text_by_url[url]))
-            else:
-                tasks.append(self._upload_single_binary(url=url))
-
+        tasks = [self._upload_single_binary(url=url) for url in urls]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         file_ids_by_url: Dict[str, str] = {}
@@ -110,21 +75,14 @@ class DocumentParserService:
         
         return valid_results
 
-    async def _upload_single_text(self, *, url: str, content: str) -> str:
-        """Upload already-downloaded text content as an HTML-ish file."""
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=True, encoding="utf-8") as f:
-            f.write(content)
-            f.flush()
-            file_obj = await self.client.files.create(file=f.name, purpose="parse")
-        return str(file_obj.id)
-
     async def _upload_single_binary(self, *, url: str) -> str:
         """Download raw bytes and upload as-is to LlamaCloud."""
 
-        data = await self.web_search_service.download_url_bytes(url)
+        suffix = self._get_suffix(url=url) or ""
 
-        suffix, _kind = self._guess_suffix_and_kind(url=url)
+        data = await self.web_search_service.download_url_bytes(url, use_render=True, timeout=10)
+        if not data:
+            raise ValueError(f"Empty content downloaded for {url}")
 
         tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=suffix, delete=False)
         try:
@@ -134,52 +92,42 @@ class DocumentParserService:
             file_obj = await self.client.files.create(file=tmp.name, purpose="parse")
             return str(file_obj.id)
         finally:
-            try:
-                import os
+            os.unlink(tmp.name)
 
-                os.unlink(tmp.name)
-            except Exception:
-                logger.warning("Failed to delete temp file %s", tmp.name, exc_info=True)
 
     async def _parse_single(self, *, url: str, file_id: str) -> RichEvidence:
         logger.info("Parsing file_id=%s (source url=%s)", file_id, url)
-
-        _suffix, kind = self._guess_suffix_and_kind(url=url)
-
-        input_options: InputOptions | None = None
-        if kind == "html":
-            html_options: InputOptionsHTML = {
-                "remove_navigation_elements": True,
-                "remove_fixed_elements": True,
-                "make_all_elements_visible": True,
-            }
-            input_options = {"html": html_options}
-
-        markdown_tables_options: OutputOptionsMarkdownTables = {
-            "output_tables_as_markdown": True,
-        }
-        markdown_options: OutputOptionsMarkdown = {
-            "annotate_links": True,
-            "tables": markdown_tables_options,
-        }
-        output_options: OutputOptions = {"images_to_save": ["embedded"], "markdown": markdown_options}
 
         parse_kwargs = {
             "file_id": file_id,
             "tier": "cost_effective",
             "version": "latest",
-            "output_options": output_options,
+            "input_options": {
+                "html": {
+                    "make_all_elements_visible": True,
+                    "remove_navigation_elements": True,
+                    "remove_fixed_elements": True,
+                }
+            },
+            "output_options": {
+                "markdown": {
+                    "annotate_links": True,
+                    "tables": {
+                        "compact_markdown_tables": True,
+                        "output_tables_as_markdown": True,
+                    }
+                },
+                "images_to_save": ["embedded"]
+            },
             "expand": [
-                "markdown_full",
+                "markdown",
                 "items",
                 "images_content_metadata",
                 "metadata",
             ],
         }
-        if input_options is not None:
-            parse_kwargs["input_options"] = input_options
 
-        job = await self.client.parsing.parse(**parse_kwargs)
+        job: ParsingGetResponse = await self.client.parsing.parse(**parse_kwargs)
 
         assets = []
         if job.images_content_metadata:
@@ -191,14 +139,27 @@ class DocumentParserService:
                     description=f"Image extracted from {url}"
                 ))
 
-        if not job.markdown_full:
-            raise ValueError(f"LlamaParse returned no markdown_full for {url}")
+        markdown_content = ""
+        if job.markdown and job.markdown.pages:
+            texts = [p.markdown for p in job.markdown.pages if p.success]
+            markdown_content = "\n\n".join(texts)
+
+        if not markdown_content:
+            raise ValueError(f"LlamaParse returned no markdown for {url}")
+
+        structured_items: list[dict] = []
+        if job.items and job.items.pages:
+            for page in job.items.pages:
+                if page.success:
+                    structured_items.extend([i.model_dump() for i in page.items])
+
+        metadata = job.metadata.model_dump() if job.metadata else {}
 
         return RichEvidence(
             source_url=url,
             content_type="unknown",
-            markdown=job.markdown_full,
-            structured_items=job.items or [],
+            markdown=markdown_content,
+            structured_items=structured_items,
             assets=assets,
-            metadata=job.metadata or {}
+            metadata=metadata,
         )

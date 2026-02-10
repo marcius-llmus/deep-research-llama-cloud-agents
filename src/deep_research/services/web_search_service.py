@@ -60,14 +60,46 @@ class WebSearchService:
 
         return content_map
 
-    async def download_url_bytes(self, url: str) -> bytes:
+    async def download_url_bytes(self, url: str, use_render: bool = True, timeout: int = 10) -> bytes:
         """Download raw bytes for a URL."""
 
         if not url:
             raise ValueError("url is required")
 
         client = AsyncClient(self._username, self._password)
-        result = await client.universal.scrape_url(url, content_encoding="base64")
-        data = json.loads(result.raw)
-        content_base64 = data["results"][0]["content"]
-        return base64.b64decode(content_base64)
+        
+        scrape_params = {
+            "url": url,
+            "content_encoding": "base64",
+            "parse": False,
+            "request_timeout": timeout,
+        }
+        if use_render:
+            scrape_params["render"] = "html"
+
+        try:
+            result = await client.universal.scrape_url(**scrape_params)
+
+            raw = getattr(result, "raw", None)
+            if raw is None:
+                raw = result
+
+            if isinstance(raw, dict):
+                data = raw
+            elif isinstance(raw, (str, bytes, bytearray)):
+                data = json.loads(raw)
+            else:
+                data = json.loads(str(raw))
+
+            results = data.get("results") or []
+            if not results:
+                return b""
+
+            content_base64 = results[0].get("content")
+            if not content_base64:
+                return b""
+
+            return base64.b64decode(content_base64)
+        except Exception as e:
+            logger.error("Failed to download %s: %s", url, e)
+            return b""
