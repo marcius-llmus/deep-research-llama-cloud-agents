@@ -1,6 +1,6 @@
 import logging
 from datetime import date
-from typing import List, Dict, Any
+from typing import List
 
 from llama_index.core import PromptTemplate
 from llama_index.llms.google_genai import GoogleGenAI
@@ -10,7 +10,6 @@ from deep_research.services.models import DecomposedQueryResponse, FollowUpQuery
 from deep_research.services.prompts import (
     OPTIMIZE_QUERY_INSTRUCTION,
     GENERATE_FOLLOW_UPS_PROMPT,
-    ENRICH_QUERY_FOR_SYNTHESIS_PROMPT,
     VERIFY_SEARCH_SUFFICIENCY_PROMPT,
 )
 
@@ -74,19 +73,5 @@ class QueryService:
         response = await self.llm.acomplete(prompt_template.format(
             query=query,
             evidence_summaries=evidence_summaries
-        ))
-        return response.text.strip()
-
-    async def enrich_query_for_synthesis(self, user_query: str, synthesizer_config: Dict[str, Any]) -> str:
-        """
-        Expands a user query into a detailed outline to guide the text synthesizer.
-        """
-        prompt_template = PromptTemplate(template=ENRICH_QUERY_FOR_SYNTHESIS_PROMPT)
-        response = await self.llm.acomplete(prompt_template.format(
-            user_query=user_query,
-            word_count=synthesizer_config.get('word_count'),
-            synthesis_type=synthesizer_config.get('synthesis_type'),
-            target_audience=synthesizer_config.get('target_audience'),
-            tone=synthesizer_config.get('tone'),
         ))
         return response.text.strip()
