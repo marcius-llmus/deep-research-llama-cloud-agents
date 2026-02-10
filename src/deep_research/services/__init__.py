@@ -3,6 +3,7 @@ from .document_parser_service import DocumentParserService
 from .evidence_service import EvidenceService
 from .query_service import QueryService
 from .report_patch_service import ReportPatchService
+from .token_counting_service import TokenCountingService
 from .web_search_service import WebSearchService
 
 
@@ -13,4 +14,5 @@ __all__ = [
     "QueryService",
     "WebSearchService",
     "ReportPatchService",
+    "TokenCountingService",
 ]
