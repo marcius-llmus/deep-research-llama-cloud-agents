@@ -5,8 +5,8 @@ from typing import Dict, List, Tuple
 import asyncio
 import base64
 import json
+from oxylabs import AsyncClient
 
-import requests
 from llama_index.readers.oxylabs import OxylabsGoogleSearchReader
 from llama_index.readers.web import OxylabsWebReader
 
@@ -66,21 +66,8 @@ class WebSearchService:
         if not url:
             raise ValueError("url is required")
 
-        api_url = f"https://{self._username}:{self._password}@realtime.oxylabs.io/v1/queries"
-        parameters = {
-            "source": "universal",
-            "url": url,
-            "content_encoding": "base64",
-        }
-
-        def _request() -> bytes:
-            response = requests.post(api_url, json=parameters, timeout=60.0)
-            if not response.ok:
-                raise RuntimeError(
-                    f"Oxylabs request failed: status={response.status_code} body={response.text}"
-                )
-            data = json.loads(response.text)
-            content_base64 = data["results"][0]["content"]
-            return base64.b64decode(content_base64)
-
-        return await asyncio.to_thread(_request)
+        client = AsyncClient(self._username, self._password)
+        result = await client.universal.scrape_url(url, content_encoding="base64")
+        data = json.loads(result.raw)
+        content_base64 = data["results"][0]["content"]
+        return base64.b64decode(content_base64)
