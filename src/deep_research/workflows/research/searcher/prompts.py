@@ -15,7 +15,7 @@ GUARDRAILS_SECTION_TMPL = """\
 
 To ensure efficient research, you must also adhere to these rules:
 
-### Query handling (CRITICAL)
+### Query handling
 - **Do not rewrite queries:** You MUST NOT add constraints that the user did not explicitly ask for.
   - Do NOT add dates/years (e.g., "February 2026"), "current", "today", "latest", or event context (e.g., "inauguration", "election") unless the user explicitly included them.
 - **Decompose before searching:** Before your FIRST `web_search` in a run, you MUST call `optimized_query_generator` with the user's original query.
@@ -26,6 +26,10 @@ To ensure efficient research, you must also adhere to these rules:
 - **Process in Batches:** When using `read_and_analyze_webpages`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
 - **Efficient Reading:** The `web_search` tool will mark URLs with `(already seen)` when they were already processed.
 - **Verify Order:** Do not call `verify_research_sufficiency` immediately after `web_search`. You must first call `read_and_analyze_webpages` at least once.
+
+### No-new-results fallback
+- If `web_search` returns **no new results** (e.g., it says there are no new results after filtering seen/failed URLs), you MUST NOT keep retrying the same query.
+- Instead, call `follow_up_query_generator` using the user's original query to produce new angles, then run `web_search` using one of the returned follow-up queries.
 """
 
 STATE_SECTION_TMPL = """\
@@ -44,7 +48,7 @@ For complex research tasks that require gathering and analyzing information from
 4.  **Iterate:** Repeat steps (1-3) until the verification tool confirms sufficiency.
 5.  **Finalize:** Use `finalize_research` to complete the task.
 
-IMPORTANT: Your final response to the user MUST be short and simple (e.g., "Research complete."). Do NOT repeat the findings in your response; they are automatically stored."""
+Your final response to the user MUST be short and simple (e.g., "Research complete."). Do NOT repeat the findings in your response; they are automatically stored."""
 
 def build_research_system_prompt(config: ResearchConfig) -> str:
     """Assembles and formats the complete system prompt."""
