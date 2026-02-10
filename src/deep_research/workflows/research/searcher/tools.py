@@ -10,6 +10,7 @@ from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.query_service import QueryService
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.workflows.research.searcher.models import EvidenceBundle
+from deep_research.services.token_counting_service import TokenCountingService
 from deep_research.workflows.research.state_keys import (
     ResearchStateKey,
     StateNamespace,
@@ -49,6 +50,35 @@ class SearcherTools(BaseToolSpec):
     def _set_seen_urls(state: dict, seen: set[str]) -> None:
         state[StateNamespace.RESEARCH][ResearchStateKey.SEEN_URLS] = sorted(seen)
 
+    @classmethod
+    def _add_seen_urls(cls, state: dict, urls: list[str]) -> None:
+        """Add URLs to the seen set, normalizing to strings and keeping state sorted."""
+
+        if not urls:
+            return
+
+        seen = cls._get_seen_urls(state)
+        seen.update(map(str, urls))
+        cls._set_seen_urls(state, seen)
+
+    @staticmethod
+    def _get_failed_urls(state: dict) -> set[str]:
+        research_state = state.get(StateNamespace.RESEARCH, {})
+        return set(map(str, research_state.get(ResearchStateKey.FAILED_URLS, [])))
+
+    @staticmethod
+    def _set_failed_urls(state: dict, failed: set[str]) -> None:
+        state.setdefault(StateNamespace.RESEARCH, {})
+        state[StateNamespace.RESEARCH][ResearchStateKey.FAILED_URLS] = sorted(failed)
+
+    @classmethod
+    def _add_failed_urls(cls, state: dict, failures: list[str]) -> None:
+        if not failures:
+            return
+        failed = cls._get_failed_urls(state)
+        failed.update(map(str, failures))
+        cls._set_failed_urls(state, failed)
+
     async def optimized_query_generator(
         self,
         query: Annotated[str, Field(description="User query to decompose into web search queries.")],
@@ -70,7 +100,7 @@ class SearcherTools(BaseToolSpec):
         """
         state = await ctx.store.get_state()
         seen_urls = self._get_seen_urls(state)
-        failed_urls = set(state[StateNamespace.RESEARCH].get(ResearchStateKey.FAILED_URLS, []))
+        failed_urls = self._get_failed_urls(state)
 
         search_data, _requests_made = await self.web_search_service.search_google(
             query=query,
@@ -107,28 +137,35 @@ class SearcherTools(BaseToolSpec):
         Reads content from a list of URLs in parallel, analyzes each for insights relevant to a directive,
         and returns a concise summary for each.
         """
-        new_items, failures = await self.evidence_service.generate_evidence(urls, directive)
+        state = await ctx.store.get_state()
+        research_state = state[StateNamespace.RESEARCH]
+        pending_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
+        pending = EvidenceBundle.model_validate(pending_raw)
 
-        async with ctx.store.edit_state() as st:
-            research_state = st[StateNamespace.RESEARCH]
+        existing_total_tokens = TokenCountingService.count_tokens(
+            "\n\n".join([(i.content or "") for i in pending.items])
+        )
 
-            current_failed = research_state.get(ResearchStateKey.FAILED_URLS, [])
-            research_state[ResearchStateKey.FAILED_URLS] = list(set(current_failed + failures))
+        new_items, failures, budget_exhausted = await self.evidence_service.generate_evidence(
+            urls,
+            directive,
+            max_total_tokens=self.config.settings.max_pending_evidence_tokens,
+            existing_total_tokens=existing_total_tokens,
+        )
 
-            seen_urls = self._get_seen_urls(st)
-            for item in new_items:
-                seen_urls.add(item.url)
-            for url in failures:
-                seen_urls.add(url)
-            self._set_seen_urls(st, seen_urls)
+        async with ctx.store.edit_state() as state:
+            research_state = state[StateNamespace.RESEARCH]
 
-            pending_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
-            pending = EvidenceBundle.model_validate(pending_raw)
+            self._add_failed_urls(state, failures)
+            self._add_seen_urls(state, [i.url for i in new_items] + list(failures))
+
+            pending_raw_edit = research_state[ResearchStateKey.PENDING_EVIDENCE]
+            pending_edit = EvidenceBundle.model_validate(pending_raw_edit)
 
             if directive:
-                pending.directive = directive
+                pending_edit.directive = directive
 
-            by_url = {i.url: i for i in pending.items}
+            by_url = {i.url: i for i in pending_edit.items}
             for item in new_items:
                 if item.url in by_url:
                     cur = by_url[item.url]
@@ -139,11 +176,12 @@ class SearcherTools(BaseToolSpec):
                     if item.topics:
                         cur.topics = list(dict.fromkeys(cur.topics + item.topics))
                     cur.assets.extend(item.assets)
+                    cur.content = item.content or cur.content
                 else:
                     by_url[item.url] = item
 
-            pending.items = list(by_url.values())
-            research_state[ResearchStateKey.PENDING_EVIDENCE] = pending.model_dump()
+            pending_edit.items = list(by_url.values())
+            research_state[ResearchStateKey.PENDING_EVIDENCE] = pending_edit.model_dump()
 
         all_summaries = []
         for item in new_items:
@@ -161,7 +199,13 @@ class SearcherTools(BaseToolSpec):
         if not all_summaries:
             return "No content could be analyzed from the provided URLs."
 
-        return "\n\n".join(all_summaries)
+        msg = "\n\n".join(all_summaries)
+        if budget_exhausted:
+            msg += (
+                "\n\n[NOTE] Reached the configured max pending evidence token budget for this turn. "
+                "Additional sources were not added."
+            )
+        return msg
 
     async def verify_research_sufficiency(
         self,
