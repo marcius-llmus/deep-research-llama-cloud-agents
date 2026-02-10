@@ -19,6 +19,15 @@ class ResearchSettings(BaseModel):
     max_report_update_size: int = Field(..., ge=1)
     timeout_seconds: int = Field(..., ge=1)
 
+    max_pending_evidence_tokens: int = Field(
+        ...,
+        ge=1,
+        description=(
+            "Maximum total token budget for the combined markdown evidence text stored in state "
+            "(sum of all EvidenceItem.content values in pending evidence)."
+        ),
+    )
+
 
 class LLMModelConfig(BaseModel):
     """Atomic configuration for a single LLM instance."""

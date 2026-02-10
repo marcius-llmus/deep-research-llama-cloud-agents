@@ -40,7 +40,8 @@
     },
     "settings": {
       "max_report_update_size": 800,
-      "timeout_seconds": 600
+      "timeout_seconds": 600,
+      "max_pending_evidence_tokens": 40000
     }
   }
 }
