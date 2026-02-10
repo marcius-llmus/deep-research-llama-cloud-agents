@@ -28,7 +28,7 @@ To ensure efficient research, you must also adhere to these rules:
 - **Verify Order:** Do not call `verify_research_sufficiency` immediately after `web_search`. You must first call `read_and_analyze_webpages` at least once.
 
 ### No-new-results fallback
-- If `web_search` returns **no new results** (e.g., it says there are no new results after filtering seen/failed URLs), you MUST NOT keep retrying the same query.
+- If `web_search` returns **no new results** or all results are with tag of seen/failed URLs, you MUST NOT keep retrying the same query.
 - Instead, call `follow_up_query_generator` using the user's original query to produce new angles, then run `web_search` using one of the returned follow-up queries.
 """
 
