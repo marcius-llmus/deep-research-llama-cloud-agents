@@ -27,12 +27,9 @@ class QueryService:
             temperature=llm_config.temperature
         )
 
-    async def generate_optimized_query(self, query: str) -> DecomposedQueryResponse:
+    async def decompose_query(self, query: str) -> DecomposedQueryResponse:
         """
         Decomposes a user request into one or more focused web search queries.
-
-        Note: despite the method name, this returns a structured response containing
-        one or more decomposed queries.
         """
         prompt_template = PromptTemplate(template=OPTIMIZE_QUERY_INSTRUCTION)
         structured_response = await self.llm.astructured_predict(

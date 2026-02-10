@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 class SearcherTools(BaseToolSpec):
     spec_functions = [
-        "optimized_query_generator",
+        "decompose_query",
         "web_search",
         "read_and_analyze_webpages",
         "verify_research_sufficiency",
@@ -79,7 +79,7 @@ class SearcherTools(BaseToolSpec):
         failed.update(map(str, failures))
         cls._set_failed_urls(state, failed)
 
-    async def optimized_query_generator(
+    async def decompose_query(
         self,
         query: Annotated[str, Field(description="User query to decompose into web search queries.")],
     ) -> str:
@@ -87,7 +87,7 @@ class SearcherTools(BaseToolSpec):
         Decomposes a research topic into one or more focused web search queries.
         Use this at the beginning of your research when the prompt includes multiple asks.
         """
-        decomposed = await self.query_service.generate_optimized_query(query=query)
+        decomposed = await self.query_service.decompose_query(query=query)
         return decomposed.formatted or "Could not generate queries"
 
     async def web_search(
