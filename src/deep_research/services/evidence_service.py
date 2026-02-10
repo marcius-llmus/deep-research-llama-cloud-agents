@@ -66,7 +66,7 @@ class EvidenceService:
         """Process a single URL: parse -> enrich -> return item."""
         doc = await self.document_parser_service.parse_stub(source=url, text=raw_text)
 
-        if not doc.text or "Could not read" in doc.text or "error occurred" in doc.text:
+        if not doc.text or not doc.text.strip():
             logger.warning(f"Failed to parse content from {url}")
             return None
 
@@ -92,7 +92,7 @@ class EvidenceService:
             content_type=doc.content_type,
             content=doc.text,
             summary=summary,
-            topics=[], 
+            topics=[],
             bullets=bullets,
             relevance=relevance,
         )

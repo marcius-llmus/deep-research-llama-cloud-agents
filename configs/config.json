@@ -40,8 +40,6 @@
     },
     "settings": {
       "max_report_update_size": 800,
-      "min_sources": 2,
-      "max_sources": 20,
       "timeout_seconds": 600
     }
   }

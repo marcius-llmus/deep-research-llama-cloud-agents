@@ -17,6 +17,7 @@ GUARDRAILS_SECTION_TMPL = """\
 - **Avoid Search Loops:** After using `web_search`, prioritize reading sources with `read_and_analyze_webpages` before searching again. Do not perform more than 3 consecutive `web_search` actions.
 - **Process in Batches:** When using `read_and_analyze_webpages`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
 - **Efficient Reading:** The `web_search` tool will mark URLs with `(already seen)` when they were already processed.
+- **Verify Order:** Do not call `verify_research_sufficiency` immediately after `web_search`. You must first call `read_and_analyze_webpages` at least once.
 """
 
 STATE_SECTION_TMPL = """\
@@ -31,8 +32,9 @@ For complex research tasks that require gathering and analyzing information from
 
 1.  **Search:** Use `web_search` to find relevant sources.
 2.  **Process Sources:** Use `read_and_analyze_webpages` with a clear `directive` to download, parse, and enrich the content from the URLs found. Prefer batches of URLs.
-3.  **Iterate:** Repeat steps (1-2) until you have sufficient information to answer the user's request.
-4.  **Finalize:** Use `finalize_research` to complete the task.
+3.  **Verify:** Use `verify_research_sufficiency` to check if you have enough information.
+4.  **Iterate:** Repeat steps (1-3) until the verification tool confirms sufficiency.
+5.  **Finalize:** Use `finalize_research` to complete the task.
 
 IMPORTANT: Your final response to the user MUST be short and simple (e.g., "Research complete."). Do NOT repeat the findings in your response; they are automatically stored."""
 

@@ -11,6 +11,7 @@ from deep_research.services.prompts import (
     OPTIMIZE_QUERY_INSTRUCTION,
     GENERATE_FOLLOW_UPS_PROMPT,
     ENRICH_QUERY_FOR_SYNTHESIS_PROMPT,
+    VERIFY_SEARCH_SUFFICIENCY_PROMPT,
 )
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,17 @@ class QueryService:
         queries = structured_response.queries
         logger.info(f"Generated {len(queries)} follow-up queries.")
         return queries
+
+    async def verify_sufficiency(self, query: str, evidence_summaries: str) -> str:
+        """
+        Checks if the gathered evidence is sufficient to answer the query.
+        """
+        prompt_template = PromptTemplate(template=VERIFY_SEARCH_SUFFICIENCY_PROMPT)
+        response = await self.llm.acomplete(prompt_template.format(
+            query=query,
+            evidence_summaries=evidence_summaries
+        ))
+        return response.text.strip()
 
     async def enrich_query_for_synthesis(self, user_query: str, synthesizer_config: Dict[str, Any]) -> str:
         """

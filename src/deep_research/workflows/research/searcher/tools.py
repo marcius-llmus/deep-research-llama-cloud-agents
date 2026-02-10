@@ -23,6 +23,7 @@ class SearcherTools(BaseToolSpec):
         "optimized_query_generator",
         "web_search",
         "read_and_analyze_webpages",
+        "verify_research_sufficiency",
         "follow_up_query_generator",
         "finalize_research",
     ]
@@ -72,7 +73,7 @@ class SearcherTools(BaseToolSpec):
 
         search_data, _requests_made = await self.web_search_service.search_google(
             query=query,
-            max_results=10,
+            max_results=self.config.searcher.max_results_per_query,
         )
         if not search_data:
             return "No results found for this query."
@@ -152,13 +153,39 @@ class SearcherTools(BaseToolSpec):
 
             all_summaries.append(f"--- Analysis for {item.url} ---\n{summary_text}")
 
-        for failed_url in failures:
-             all_summaries.append(f"--- Analysis for {failed_url} ---\nCould not read content (error or empty).")
-
         if not all_summaries:
             return "No content could be analyzed from the provided URLs."
 
         return "\n\n".join(all_summaries)
+
+    async def verify_research_sufficiency(
+        self,
+        ctx: Context,
+        query: Annotated[str, Field(description="The original user query to check against.")],
+    ) -> str:
+        """
+        Checks if the gathered evidence is sufficient to answer the user's query.
+        Returns an analysis of what is covered and what is missing.
+        """
+        state = await ctx.store.get_state()
+        research_state = state[StateNamespace.RESEARCH]
+        pending = research_state.get(ResearchStateKey.PENDING_EVIDENCE, {})
+        items = pending.get("items", [])
+        evidence_summaries = [
+            f"Source: {item.get('url', 'unknown')}\n"
+            f"Relevance: {item.get('relevance', 0.0)}\n"
+            f"Summary: {item.get('summary', 'No summary')}"
+            for item in items
+        ]
+
+        evidence_text = "\n\n".join(evidence_summaries).strip()
+        if not evidence_text:
+            return "No evidence gathered yet. Use web_search, then read_and_analyze_webpages to gather evidence before verifying sufficiency."
+
+        return await self.query_service.verify_sufficiency(
+            query=query,
+            evidence_summaries=evidence_text
+        )
 
     async def follow_up_query_generator(
         self,

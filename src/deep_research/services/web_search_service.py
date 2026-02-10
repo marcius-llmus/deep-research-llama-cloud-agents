@@ -48,18 +48,18 @@ class WebSearchService:
         if not urls:
             return {}
 
+        reader = OxylabsWebReader(username=self._username, password=self._password)
         try:
-            reader = OxylabsWebReader(username=self._username, password=self._password)
             documents = await reader.aload_data(urls=urls)
-
-            content_map = {doc.metadata['url']: doc.text for doc in documents if 'url' in doc.metadata}
-
-            # For URLs that failed
-            for url in urls:
-                if url not in content_map:
-                    content_map[url] = f"Could not read any content from the URL: {url}"
-
-            return content_map
         except Exception as e:
-            logger.error(f"WebSearchService failed to read URLs: {e}", exc_info=True)
-            return {url: f"An error occurred while trying to read the URL {url}: {str(e)}" for url in urls}
+            logger.error("WebSearchService failed to read URLs", exc_info=e)
+            return {}
+
+        content_map: Dict[str, str] = {}
+        for doc in documents:
+            url = (doc.metadata or {}).get("url")
+            text = (doc.text or "").strip()
+            if url and text:
+                content_map[url] = text
+
+        return content_map

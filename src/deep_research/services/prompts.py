@@ -76,7 +76,6 @@ ENRICH_EVIDENCE_PROMPT = """
 </content>
 """
 
-# todo I think we shall use it for the orchestrator
 ENRICH_QUERY_FOR_SYNTHESIS_PROMPT = """
 **Instructions:**
 1.  Your task is to act as a neutral research assistant. You will expand a user's query into a detailed set of instructions for a writer AI.
