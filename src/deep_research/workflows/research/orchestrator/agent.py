@@ -56,15 +56,13 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
         pending_evidence = research_state[ResearchStateKey.PENDING_EVIDENCE]
         items = pending_evidence.get("items", [])
         
-        sorted_items = sorted(items, key=lambda x: x.get("relevance", 0.0), reverse=True)
-        
+
         evidence_lines = []
-        for item in sorted_items:
+        for item in items:
             url = item.get("url", "unknown")
             summary = item["summary"]
-            relevance = item.get("relevance", 0.0)
             assets = item.get("assets", [])
-            evidence_lines.append(f"- [{relevance:.2f}] {url}: {summary}")
+            evidence_lines.append(f"- {url}: {summary}")
             if assets:
                 evidence_lines.append(f"  Assets ({len(assets)}):")
                 for asset in assets:

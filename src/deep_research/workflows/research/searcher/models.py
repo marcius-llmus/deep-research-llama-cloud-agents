@@ -10,12 +10,6 @@ class EvidenceItem(BaseModel):
         description="Cheap-LLM summary used by orchestrator to avoid reading raw content.",
     )
     content: str = Field(default="", description="Full raw text content of the source.")
-    relevance: float = Field(
-        0.0,
-        description="Relevance score for the overall source (0.0-1.0).",
-        ge=0.0,
-        le=1.0,
-    )
     assets: list[ParsedDocumentAsset] = Field(default_factory=list, description="Selected rich assets (images, tables) from the source.")
 
 
@@ -32,5 +26,4 @@ class EvidenceBundle(BaseModel):
         for i, item in enumerate(self.items, 1):
             lines.append(f"{i}. {item.url}")
             lines.append(f"   Summary: {item.summary}")
-            lines.append(f"   Relevance: {item.relevance:.2f}")
         return "\n".join(lines)

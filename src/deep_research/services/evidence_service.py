@@ -158,7 +158,6 @@ class EvidenceService:
                 f"- {insight.content} (Relevance: {insight.relevance_score:.2f})"
                 for insight in analysis_result.insights
             )
-            relevance = max((i.relevance_score for i in analysis_result.insights), default=0.0)
 
             selected_assets = []
             for asset in evidence.assets:

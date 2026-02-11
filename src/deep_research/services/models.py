@@ -16,7 +16,6 @@ class ParsedDocument(BaseModel):
 
     source_url: str
     markdown: str
-    structured_items: List[dict] = Field(default_factory=list)
     assets: List[ParsedDocumentAsset] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

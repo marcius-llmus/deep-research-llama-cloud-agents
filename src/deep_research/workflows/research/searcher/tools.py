@@ -205,7 +205,6 @@ class SearcherTools(BaseToolSpec):
         items = pending.get("items", [])
         evidence_summaries = [
             f"Source: {item.get('url', 'unknown')}\n"
-            f"Relevance: {item.get('relevance', 0.0)}\n"
             f"Summary: {item.get('summary', 'No summary')}"
             for item in items
         ]
