@@ -40,9 +40,9 @@ call_research_agent(prompt: str) -> str
 - The Searcher gathers evidence (documents, text, images, tables/csv-like data when available) and updates the CURRENT EVIDENCE SUMMARY.
 - If the CURRENT EVIDENCE SUMMARY is not strong enough for your purpose, call the Searcher again with a refined prompt. The Searcher will expand evidence and produce an updated summary.
 
-call_write_agent(prompt: str) -> str
+call_write_agent(instruction: str) -> str
 - Use this when the CURRENT EVIDENCE SUMMARY is sufficient to update the report.
-- Your prompt must be specific and editorial:
+- Your instruction must be specific and editorial:
   - which plan item(s) this update satisfies
   - exactly what sections to add/update in the report
   - what structure to use (headings, bullet points, comparison tables, etc.)

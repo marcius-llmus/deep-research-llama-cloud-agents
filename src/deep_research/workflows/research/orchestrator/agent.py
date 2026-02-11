@@ -35,15 +35,15 @@ async def call_research_agent(ctx: Context[DeepResearchState], prompt: str) -> s
         return state.research_turn.evidence.get_summary()
 
 
-async def call_write_agent(ctx: Context[DeepResearchState], prompt: str) -> str:
-    print(f"Orchestrator -> WriteAgent: {prompt}")
+async def call_write_agent(ctx: Context[DeepResearchState], instruction: str) -> str:
+    print(f"Orchestrator -> WriteAgent: {instruction}")
 
     async with ctx.store.edit_state() as state:
         evidence_text = state.research_turn.evidence.get_content_for_writing()
 
     user_msg = "Update the report based on the following research notes and instructions.\n\n"
     user_msg += f"Research Notes:\n<research_notes>{evidence_text}</research_notes>\n\n"
-    user_msg += f"Instruction: {prompt}"
+    user_msg += f"Instruction: {instruction}"
 
     result = await writer_agent.run(user_msg=user_msg, ctx=ctx)
 
@@ -66,8 +66,6 @@ class OrchestratorWorkflow(Workflow):
             state.research_turn.clear()
 
             state.research_artifact.path = "artifacts/report.md"
-            state.research_artifact.content = ""
-            state.research_artifact.draft_content = ""
             state.research_artifact.status = ResearchArtifactStatus.RUNNING
 
     @step
