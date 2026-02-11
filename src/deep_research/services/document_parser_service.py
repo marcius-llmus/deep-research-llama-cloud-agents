@@ -63,11 +63,10 @@ class DocumentParserService:
                         "output_tables_as_markdown": True,
                     }
                 },
-                "images_to_save": ["embedded"]
+                "images_to_save": ["layout"]
             },
             "expand": [
                 "markdown",
-                "items",
                 "images_content_metadata",
                 "metadata",
             ],
@@ -95,18 +94,11 @@ class DocumentParserService:
         if not markdown_content:
             raise ValueError(f"LlamaParse returned no markdown for {url}")
 
-        structured_items: list[dict] = []
-        if job.items and job.items.pages:
-            for page in job.items.pages:
-                if page.success:
-                    structured_items.extend([i.model_dump() for i in page.items])
-
         metadata = job.metadata.model_dump() if job.metadata else {}
 
         return ParsedDocument(
             source_url=url,
             markdown=markdown_content,
-            structured_items=structured_items,
             assets=assets,
             metadata=metadata,
         )
