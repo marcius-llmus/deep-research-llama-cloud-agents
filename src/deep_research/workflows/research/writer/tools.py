@@ -124,7 +124,7 @@ class WriterTools(BaseToolSpec):
 
         return ReviewPatchResponse(
             decision="approved",
-            message="Patch reviewed and committed. Report updated.",
+            message="Patch reviewed and committed. Report updated. New research turn started.",
             added_lines=added,
             removed_lines=removed,
         ).model_dump_json()
