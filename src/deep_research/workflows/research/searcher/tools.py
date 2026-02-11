@@ -23,7 +23,7 @@ class SearcherTools(BaseToolSpec):
     spec_functions = [
         "decompose_query",
         "web_search",
-        "read_and_analyze_webpages",
+        "generate_evidences",
         "verify_research_sufficiency",
         "follow_up_query_generator",
         "finalize_research",
@@ -130,7 +130,7 @@ class SearcherTools(BaseToolSpec):
 
         return "\n\n".join(formatted_results)
 
-    async def read_and_analyze_webpages(
+    async def generate_evidences(
         self,
         ctx: Context,
         urls: Annotated[List[str], Field(description="URLs to read.")],
@@ -212,7 +212,7 @@ class SearcherTools(BaseToolSpec):
 
         evidence_text = "\n\n".join(evidence_summaries).strip()
         if not evidence_text:
-            return "No evidence gathered yet. Use web_search, then read_and_analyze_webpages to gather evidence before verifying sufficiency."
+            return "No evidence gathered yet. Use web_search, then generate_evidences to gather evidence before verifying sufficiency."
 
         return await self.query_service.verify_sufficiency(
             query=query,
