@@ -9,7 +9,6 @@ class StateNamespace(StrEnum):
 
 class OrchestratorStateKey(StrEnum):
     RESEARCH_NOTES = "research_notes"
-    REVIEW = "review"
 
 
 class ResearchStateKey(StrEnum):

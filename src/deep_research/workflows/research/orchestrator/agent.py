@@ -1,5 +1,3 @@
-import re
-
 from llama_index.core.agent.workflow import FunctionAgent
 from llama_index.core.workflow import Context, StartEvent, StopEvent, step, Workflow
 from llama_index.core.tools import FunctionTool
@@ -19,7 +17,6 @@ from deep_research.workflows.research.orchestrator.prompts import build_orchestr
 
 from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
 from deep_research.workflows.research.writer.agent import workflow as writer_agent
-from deep_research.workflows.research.reviewer.agent import workflow as reviewer_agent
 
 cfg = load_config_from_json(
     model=ResearchConfig,
@@ -75,15 +72,11 @@ async def call_write_agent(ctx: Context, instruction: str) -> str:
     state = await ctx.store.get_state()
     orch = state[StateNamespace.ORCHESTRATOR]
     notes = orch[OrchestratorStateKey.RESEARCH_NOTES]
-    review_feedback = orch[OrchestratorStateKey.REVIEW]
 
     if not notes:
         return "No research notes to write from."
 
     user_msg = "Update the report based on the following research notes and instructions.\n\n"
-
-    if review_feedback:
-        user_msg += f"Review Feedback:\n<feedback>{review_feedback}</feedback>\n\n"
 
     notes_str = "\n\n".join(notes)
     user_msg += f"Research Notes:\n<research_notes>{notes_str}</research_notes>\n\n"
@@ -94,27 +87,8 @@ async def call_write_agent(ctx: Context, instruction: str) -> str:
     return str(result.response)
 
 
-async def call_review_agent(ctx: Context, instructions: str = "Review the report") -> str:
-    print(f"Orchestrator -> ReviewAgent: {instructions}")
-    
-    state = await ctx.store.get_state()
-    report = state[StateNamespace.REPORT][ReportStateKey.CONTENT]
-
-    result = await reviewer_agent.run(
-        user_msg=f"{instructions}\n\nReport Content:\n{report}",
-        ctx=ctx,
-    )
-
-    async with ctx.store.edit_state() as s:
-        orch = s[StateNamespace.ORCHESTRATOR]
-        orch[OrchestratorStateKey.REVIEW] = str(result.response)
-
-    return str(result.response)
-
-
 research_tool = FunctionTool.from_defaults(fn=call_research_agent)
 write_tool = FunctionTool.from_defaults(fn=call_write_agent)
-review_tool = FunctionTool.from_defaults(fn=call_review_agent)
 
 class OrchestratorWorkflow(Workflow):
     """
@@ -128,7 +102,6 @@ class OrchestratorWorkflow(Workflow):
             if StateNamespace.ORCHESTRATOR not in state:
                 state[StateNamespace.ORCHESTRATOR] = {
                     OrchestratorStateKey.RESEARCH_NOTES: [],
-                    OrchestratorStateKey.REVIEW: None,
                 }
             if StateNamespace.RESEARCH not in state:
                 state[StateNamespace.RESEARCH] = {
@@ -156,7 +129,7 @@ class OrchestratorWorkflow(Workflow):
             description="Manages the report generation process.",
             system_prompt=dynamic_system_prompt,
             llm=llm,
-            tools=[research_tool, write_tool, review_tool],
+            tools=[research_tool, write_tool],
         )
         
         result = await agent.run(user_msg=str(ev.user_msg or "Proceed with the next step."))

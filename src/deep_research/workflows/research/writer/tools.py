@@ -7,7 +7,6 @@ from pydantic import BaseModel, Field, create_model
 
 from deep_research.config import ResearchConfig
 from deep_research.services.report_patch_service import ReportPatchService
-from deep_research.workflows.research.reviewer.agent import workflow as reviewer_agent
 from deep_research.workflows.research.state_keys import (
     ReportStateKey,
     StateNamespace,
@@ -146,16 +145,4 @@ class WriterTools(BaseToolSpec):
             },
         )
 
-    async def reviewer(
-        self,
-        ctx: Context,
-        report_markdown: Annotated[
-            str,
-            Field(description="Report markdown to review."),
-        ],
-    ) -> str:
-        result = await reviewer_agent.run(
-            user_msg=f"Review the following report:\n\n{report_markdown}",
-            ctx=ctx,
-        )
-        return str(result.response)
+    
