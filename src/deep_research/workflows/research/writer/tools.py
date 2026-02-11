@@ -13,7 +13,7 @@ from deep_research.workflows.research.state_keys import (
     StateNamespace,
 )
 
-from apply_patch_py.utils import (
+from deep_research.services.patch_prompts import (
     get_patch_format_instructions,
     get_patch_format_tool_instructions,
 )

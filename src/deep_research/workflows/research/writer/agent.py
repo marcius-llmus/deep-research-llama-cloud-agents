@@ -26,7 +26,12 @@ system_prompt = """You are an expert technical writer.
 Your goal is to write and update a comprehensive markdown report based on the provided research notes.
 
 Tools:
-- `apply_patch`: Use this tool to update the report content. You must provide a valid patch (diff).
+- `apply_patch`: Update the report content by providing a valid patch (diff).
+
+Critical constraint:
+- The report file is `artifacts/report.md`.
+- Your patch MUST use `*** Update File: artifacts/report.md` (not `report.md`).
+- Do not add, delete, move, or rename files.
 
 Instructions:
 1. Read the research notes and any review feedback.
