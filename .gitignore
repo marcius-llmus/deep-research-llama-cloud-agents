@@ -39,3 +39,4 @@ workflows.db
 workflows.json
 logs.jsonl
 data/
+debug/
