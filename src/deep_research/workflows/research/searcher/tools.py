@@ -26,7 +26,6 @@ class SearcherTools(BaseToolSpec):
         "generate_evidences",
         "verify_research_sufficiency",
         "follow_up_query_generator",
-        "finalize_research",
     ]
 
     def __init__(
@@ -240,13 +239,7 @@ class SearcherTools(BaseToolSpec):
             original_query=original_query,
         )
 
-        async with ctx.store.edit_state() as st:
-            st[StateNamespace.RESEARCH][ResearchStateKey.FOLLOW_UP_QUERIES] = queries
+        async with ctx.store.edit_state() as state:
+            state[StateNamespace.RESEARCH][ResearchStateKey.FOLLOW_UP_QUERIES] = queries
 
         return "\n".join(f"- {q}" for q in queries)
-
-    async def finalize_research(self, ctx: Context) -> str:
-        """
-        MUST be called as the final step.
-        """
-        return "Research finalized. All gathered documents are now compiled."

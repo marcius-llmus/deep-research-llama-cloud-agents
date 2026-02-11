@@ -23,6 +23,7 @@ class ResearchStateKey(StrEnum):
 class ReportStateKey(StrEnum):
     PATH = "path"
     CONTENT = "content"
+    DRAFT_CONTENT = "draft_content"
     STATUS = "status"
 
 
