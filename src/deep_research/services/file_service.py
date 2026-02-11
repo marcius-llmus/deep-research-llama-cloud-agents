@@ -20,7 +20,7 @@ class FileService:
         if not content:
             raise ValueError("Content cannot be empty")
 
-        with tempfile.NamedTemporaryFile(mode="wb", delete=False, suffix=".tmp") as tmp:
+        with tempfile.NamedTemporaryFile(mode="wb", delete=False) as tmp:
             tmp.write(content)
             tmp.flush()
             tmp_path = tmp.name

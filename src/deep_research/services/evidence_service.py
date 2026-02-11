@@ -128,13 +128,7 @@ class EvidenceService:
         parsed = urlparse(url)
         suffix = (PurePosixPath(parsed.path).suffix or "").lower()
 
-        if not suffix or any(ch in suffix for ch in ("/", "\\")):
-            return ".html"
-
-        if len(suffix) > 10:
-            return ".html"
-
-        if not suffix.startswith("."):
+        if not suffix or len(suffix) > 10 or not suffix.startswith("."):
             return ".html"
 
         return suffix
