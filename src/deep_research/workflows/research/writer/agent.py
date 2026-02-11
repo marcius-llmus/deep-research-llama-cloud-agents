@@ -22,7 +22,18 @@ llm = GoogleGenAI(
 tools_spec = WriterTools(config=cfg)
 tools = tools_spec.to_tool_list()
 
-system_prompt = "You are an expert technical writer. Your goal is to write a comprehensive report based on the provided research notes."
+system_prompt = """You are an expert technical writer.
+Your goal is to write and update a comprehensive markdown report based on the provided research notes.
+
+Tools:
+- `apply_patch`: Use this tool to update the report content. You must provide a valid patch (diff).
+
+Instructions:
+1. Read the research notes and any review feedback.
+2. Determine what changes are needed in the report.
+3. Use `apply_patch` to apply those changes.
+4. Do NOT output the full report in your response. Only use the tool.
+"""
 
 workflow = FunctionAgent(
     name="WriterAgent",

@@ -14,6 +14,7 @@ from deep_research.workflows.research.state_keys import (
     ReportStatus,
     ResearchStateKey,
 )
+from deep_research.workflows.research.searcher.models import EvidenceBundle
 from deep_research.workflows.research.orchestrator.prompts import build_orchestrator_system_prompt
 
 from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
@@ -53,22 +54,13 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
 
     async with ctx.store.edit_state() as state:
         research_state = state[StateNamespace.RESEARCH]
-        pending_evidence = research_state[ResearchStateKey.PENDING_EVIDENCE]
-        items = pending_evidence.get("items", [])
-        
+        pending_evidence_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
 
-        evidence_lines = []
-        for item in items:
-            url = item.get("url", "unknown")
-            summary = item["summary"]
-            assets = item.get("assets", [])
-            evidence_lines.append(f"- {url}: {summary}")
-            if assets:
-                evidence_lines.append(f"  Assets ({len(assets)}):")
-                for asset in assets:
-                    evidence_lines.append(f"    - [{asset.get('type', 'unknown')}] {asset.get('description', 'No desc')} (ID: {asset.get('id')}) -> {asset.get('url')}")
-            
-        evidence_text = "\n".join(evidence_lines) if evidence_lines else "No evidence gathered."
+        try:
+            bundle = EvidenceBundle.model_validate(pending_evidence_raw)
+            evidence_text = bundle.get_content_for_writing()
+        except Exception:
+            evidence_text = "Error parsing pending evidence state."
         
         orch = state[StateNamespace.ORCHESTRATOR]
         note_entry = f"### Research on '{prompt}':\n{evidence_text}\n"
@@ -88,25 +80,18 @@ async def call_write_agent(ctx: Context, instruction: str) -> str:
     if not notes:
         return "No research notes to write from."
 
-    user_msg = "Write a markdown report from the following notes. Be sure to output the report in the following format: <report>...</report>:\n\n"
+    user_msg = "Update the report based on the following research notes and instructions.\n\n"
 
     if review_feedback:
-        user_msg += f"<feedback>{review_feedback}</feedback>\n\n"
+        user_msg += f"Review Feedback:\n<feedback>{review_feedback}</feedback>\n\n"
 
     notes_str = "\n\n".join(notes)
-    user_msg += f"<research_notes>{notes_str}</research_notes>\n\n"
+    user_msg += f"Research Notes:\n<research_notes>{notes_str}</research_notes>\n\n"
     user_msg += f"Instruction: {instruction}"
 
     result = await writer_agent.run(user_msg=user_msg, ctx=ctx)
 
-    match = re.search(r"<report>(.*)</report>", str(result.response), re.DOTALL)
-    if not match:
-        return "Writer produced output but missed <report> tags."
-
-    report_content = match.group(1).strip()
-    async with ctx.store.edit_state() as s:
-        s[StateNamespace.REPORT][ReportStateKey.CONTENT] = report_content
-    return "Report updated."
+    return str(result.response)
 
 
 async def call_review_agent(ctx: Context, instructions: str = "Review the report") -> str:

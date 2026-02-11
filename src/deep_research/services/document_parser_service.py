@@ -63,7 +63,7 @@ class DocumentParserService:
                         "output_tables_as_markdown": True,
                     }
                 },
-                "images_to_save": ["layout"]
+                "images_to_save": ["layout", "embedded"]
             },
             "expand": [
                 "markdown",
@@ -77,6 +77,9 @@ class DocumentParserService:
         assets: list[ParsedDocumentAsset] = []
         if job.images_content_metadata:
             for img in job.images_content_metadata.images:
+                if not img.presigned_url:
+                    continue
+
                 assets.append(
                     ParsedDocumentAsset(
                         id=img.filename,

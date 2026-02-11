@@ -168,6 +168,7 @@ class EvidenceService:
             item = EvidenceItem(
                 url=evidence.source_url,
                 title=evidence.metadata.get("title"),
+                metadata=evidence.metadata,
                 content=evidence.markdown,
                 summary=summary,
                 assets=selected_assets,
