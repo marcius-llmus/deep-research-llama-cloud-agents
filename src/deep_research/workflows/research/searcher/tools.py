@@ -62,12 +62,10 @@ class SearcherTools(BaseToolSpec):
 
     @staticmethod
     def _get_failed_urls(state: dict) -> set[str]:
-        research_state = state.get(StateNamespace.RESEARCH, {})
-        return set(map(str, research_state.get(ResearchStateKey.FAILED_URLS, [])))
+        return set(map(str, state[StateNamespace.RESEARCH][ResearchStateKey.FAILED_URLS]))
 
     @staticmethod
     def _set_failed_urls(state: dict, failed: set[str]) -> None:
-        state.setdefault(StateNamespace.RESEARCH, {})
         state[StateNamespace.RESEARCH][ResearchStateKey.FAILED_URLS] = sorted(failed)
 
     @classmethod
@@ -200,11 +198,11 @@ class SearcherTools(BaseToolSpec):
         """
         state = await ctx.store.get_state()
         research_state = state[StateNamespace.RESEARCH]
-        pending = research_state.get(ResearchStateKey.PENDING_EVIDENCE, {})
-        items = pending.get("items", [])
+        pending = research_state[ResearchStateKey.PENDING_EVIDENCE]
+        items = pending["items"]
         evidence_summaries = [
-            f"Source: {item.get('url', 'unknown')}\n"
-            f"Summary: {item.get('summary', 'No summary')}"
+            f"Source: {item['url']}\n"
+            f"Summary: {item['summary']}"
             for item in items
         ]
 

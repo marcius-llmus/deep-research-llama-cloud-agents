@@ -8,14 +8,14 @@ class StateNamespace(StrEnum):
 
 
 class OrchestratorStateKey(StrEnum):
-    RESEARCH_NOTES = "research_notes"
+    RESEARCH_PLAN = "research_plan"
+    CURRENT_RESEARCH = "current_research"
 
 
 class ResearchStateKey(StrEnum):
     SEEN_URLS = "seen_urls"
     PENDING_EVIDENCE = "pending_evidence"
     FOLLOW_UP_QUERIES = "follow_up_queries"
-    CURRENT_QUERY = "current_query"
     FAILED_URLS = "failed_urls"
 
 

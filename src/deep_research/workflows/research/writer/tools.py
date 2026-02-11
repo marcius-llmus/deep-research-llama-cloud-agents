@@ -9,6 +9,7 @@ from deep_research.config import ResearchConfig
 from deep_research.services.report_patch_service import ReportPatchService
 from deep_research.workflows.research.state_keys import (
     ReportStateKey,
+    ResearchStateKey,
     StateNamespace,
 )
 
@@ -55,8 +56,8 @@ def _build_review_patch_metadata() -> ToolMetadata:
 
 
 def _count_line_changes(*, old: str, new: str) -> tuple[int, int]:
-    old_lines = (old or "").splitlines()
-    new_lines = (new or "").splitlines()
+    old_lines = old.splitlines()
+    new_lines = new.splitlines()
 
     old_set = {}
     for line in old_lines:
@@ -95,7 +96,7 @@ class WriterTools(BaseToolSpec):
     ) -> str:
         state = await ctx.store.get_state()
         report_state = state[StateNamespace.REPORT]
-        current = report_state.get(ReportStateKey.CONTENT, "")
+        current = report_state[ReportStateKey.CONTENT]
 
         new_content, added, removed = await self.report_patch_service.apply_patch(
             original_text=current,
@@ -112,8 +113,8 @@ class WriterTools(BaseToolSpec):
     async def review_patch(self, ctx: Context) -> str: # noqa
         async with ctx.store.edit_state() as state:
             report_state = state[StateNamespace.REPORT]
-            draft = report_state.get(ReportStateKey.DRAFT_CONTENT, "")
-            current = report_state.get(ReportStateKey.CONTENT, "")
+            draft = report_state[ReportStateKey.DRAFT_CONTENT]
+            current = report_state[ReportStateKey.CONTENT]
 
             if not draft.strip():
                 return ReviewPatchResponse(
@@ -125,6 +126,12 @@ class WriterTools(BaseToolSpec):
 
             report_state[ReportStateKey.CONTENT] = draft
             report_state[ReportStateKey.DRAFT_CONTENT] = ""
+
+            state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE] = {
+                "queries": [],
+                "items": [],
+            }
+            state[StateNamespace.RESEARCH][ResearchStateKey.FOLLOW_UP_QUERIES] = []
 
         return ReviewPatchResponse(
             decision="approved",

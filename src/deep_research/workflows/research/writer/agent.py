@@ -27,6 +27,7 @@ Your goal is to write and update a comprehensive markdown report based on the pr
 
 Tools:
 - `apply_patch`: Update the report content by providing a valid patch (diff).
+- `review_patch`: If review passes, commit the draft to the main report. Else, request new writes.
 
 Critical constraint:
 - The report file is `artifacts/report.md`.
@@ -37,7 +38,8 @@ Instructions:
 1. Read the research notes and any review feedback.
 2. Determine what changes are needed in the report.
 3. Use `apply_patch` to apply those changes.
-4. Do NOT output the full report in your response. Only use the tool.
+4. IMMEDIATELY use `review_patch` to commit the draft to the main report or write again in case of errors.
+5. Do NOT output the full report in your response. Only use the tools.
 """
 
 workflow = FunctionAgent(

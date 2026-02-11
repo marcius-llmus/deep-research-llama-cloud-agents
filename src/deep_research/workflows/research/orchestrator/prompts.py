@@ -1,57 +1,93 @@
 from deep_research.workflows.research.searcher.models import EvidenceBundle
-from deep_research.workflows.research.state_keys import ReportStateKey, ResearchStateKey, StateNamespace
+from deep_research.workflows.research.state_keys import (
+    OrchestratorStateKey,
+    StateNamespace,
+    ReportStateKey,
+    ResearchStateKey,
+)
 
-ORCHESTRATOR_SYSTEM_TEMPLATE = """
-You are the Chief Editor and Orchestrator of a deep research project.
-Your goal is to produce a comprehensive report by coordinating a Researcher (who finds info) and a Writer (who compiles it).
+ORCHESTRATOR_SYSTEM_TEMPLATE = """You are the Orchestrator for a deep research run.
 
-### Current Report Status
-{report_status}
+You work like a principal investigator:
+- You decide what is missing by reading the Actual Research (the report) and comparing it to the Initial Research Plan.
+- You delegate evidence collection to the Searcher and report updates to the Writer.
+- You iterate until the plan is satisfied in the report.
+- You do not do web research yourself.
 
-### Pending Evidence (Summaries)
-The following evidence has been gathered but not yet incorporated into the report:
-{pending_evidence}
+========================
+STATE (WHAT YOU SEE)
+========================
 
-### Instructions
-1. Analyze the "Pending Evidence". Does it cover the current gaps in the report?
-2. Compare it against the "Current Report Status".
-3. Decide your next move:
-   - If you need more information, instruct the **SearcherAgent** to find it. Be specific about what is missing.
-   - If the evidence is sufficient for a section, instruct the **WriterAgent** to write/update that section using the pending evidence.
-   - If the report is complete, run the **ReviewerAgent**.
+INITIAL RESEARCH PLAN (checklist):
+<research_plan>
+{research_plan}
+</research_plan>
 
-Keep your instructions clear and directive.
+ACTUAL RESEARCH (the report markdown; Writer edits this):
+<actual_research>
+{actual_research}
+</actual_research>
+
+CURRENT EVIDENCE SUMMARY (latest batch gathered by the Searcher for the current question):
+<evidence_summary>
+{evidence_summary}
+</evidence_summary>
+
+Notes:
+- The evidence summary is the only evidence you need to read.
+- Treat evidence as per-turn working material used to update the report. After the report is updated, a new research turn starts with fresh evidence.
+
+========================
+TOOLS (HOW TO USE THEM)
+========================
+
+call_research_agent(prompt: str) -> str
+- Use this to ask the Searcher for evidence needed to satisfy a specific missing plan item.
+- The Searcher gathers evidence (documents, text, images, tables/csv-like data when available) and updates the CURRENT EVIDENCE SUMMARY.
+- If the CURRENT EVIDENCE SUMMARY is not strong enough for your purpose, call the Searcher again with a refined prompt. The Searcher will expand evidence and produce an updated summary.
+
+call_write_agent(instruction: str) -> str
+- Use this when the CURRENT EVIDENCE SUMMARY is sufficient to update the report.
+- Your instruction must be specific and editorial:
+  - which plan item(s) this update satisfies
+  - exactly what sections to add/update in the report
+  - what structure to use (headings, bullet points, comparison tables, etc.)
+  - what level of detail is required (definitions, examples, edge cases, caveats)
+
+========================
+WORK LOOP (UNTIL PLAN IS DONE)
+========================
+
+Repeat:
+
+1) Read ACTUAL RESEARCH fully.
+2) Compare it to the INITIAL RESEARCH PLAN.
+3) Identify the single most important missing requirement (one plan item at a time).
+4) If CURRENT EVIDENCE SUMMARY is empty or not targeted to that requirement:
+   - call call_research_agent() with a focused prompt targeting only that missing requirement.
+5) Read CURRENT EVIDENCE SUMMARY:
+   - If you are not comfortable that it’s sufficient, refine the question and call call_research_agent() again.
+   - If sufficient, call call_write_agent() with precise instructions to incorporate it into ACTUAL RESEARCH.
+6) Re-read ACTUAL RESEARCH and verify the missing plan item is now covered.
+7) Move to the next missing plan item.
+
+Stop only when every plan item is clearly satisfied in ACTUAL RESEARCH.
+
+
+Output policy:
+- Prefer tool calls.
+- Keep any non-tool text minimal and action-oriented.
 """
 
 def build_orchestrator_system_prompt(state: dict) -> str:
-    """
-    Constructs the dynamic system prompt for the Orchestrator.
-    Injects the current report status and summaries of pending evidence.
-    """
-    
-    report_state = state.get(StateNamespace.REPORT, {})
-    report_content = report_state.get(ReportStateKey.CONTENT, "")
-    if not report_content:
-        report_status = "(The report is currently empty.)"
-    else:
-        preview_len = 2000
-        if len(report_content) > preview_len:
-            report_status = f"{report_content[:preview_len]}...\n(Report truncated, total length: {len(report_content)} chars)"
-        else:
-            report_status = report_content
+    research_plan = state[StateNamespace.ORCHESTRATOR][OrchestratorStateKey.RESEARCH_PLAN]
+    report_content = state[StateNamespace.REPORT][ReportStateKey.CONTENT]
 
-    research_state = state.get(StateNamespace.RESEARCH, {})
-    pending_raw = research_state.get(ResearchStateKey.PENDING_EVIDENCE, {})
-    
-    pending_evidence_str = "(No pending evidence.)"
-    if pending_raw:
-        try:
-            bundle = EvidenceBundle.model_validate(pending_raw)
-            pending_evidence_str = bundle.get_summary()
-        except Exception:
-            pending_evidence_str = "(Error parsing pending evidence state.)"
+    pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
+    evidence_summary = EvidenceBundle.model_validate(pending_raw).get_summary()
 
     return ORCHESTRATOR_SYSTEM_TEMPLATE.format(
-        report_status=report_status,
-        pending_evidence=pending_evidence_str
+        research_plan=research_plan,
+        actual_research=report_content,
+        evidence_summary=evidence_summary,
     )
