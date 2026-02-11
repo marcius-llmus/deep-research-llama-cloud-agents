@@ -8,59 +8,31 @@ from deep_research.workflows.research.searcher.agent import workflow as searcher
 from deep_research.workflows.research.state_keys import ResearchStateKey, StateNamespace
 
 
-def _safe_truncate(text: str, limit: int = 500) -> str:
-    text = (text or "").replace("\n", "\\n")
-    if len(text) <= limit:
-        return text
-    return text[:limit] + f"... <truncated {len(text) - limit} chars>"
+def _redact_tool_kwargs(tool_kwargs: Any) -> Any:
+    if not isinstance(tool_kwargs, dict):
+        return tool_kwargs
+    redacted = tool_kwargs.copy()
+    # Redact common large fields if they appear
+    for key in ["diff", "content", "text"]:
+        if key in redacted:
+            val = redacted[key]
+            size = len(val) if isinstance(val, str) else 0
+            if size > 500:
+                redacted[key] = f"<redacted {key} {size} chars>"
+    return redacted
 
 
-def _format_event(ev: Any) -> str:
-    """Best-effort compact event formatting.
-
-    We avoid dumping full chat histories/tool payloads, which can be extremely large.
-    """
-
+def _format_event(ev: Any) -> str | None:
     name = type(ev).__name__
 
-    delta = getattr(ev, "delta", None)
-    if delta is not None:
-        return f"{name} delta={_safe_truncate(str(delta), limit=200)}"
+    if name == "ToolCall":
+        kwargs = _redact_tool_kwargs(ev.tool_kwargs)
+        return f"ToolCall(name={ev.tool_name}, id={ev.tool_id}, kwargs={kwargs})"
 
-    tool_name = getattr(ev, "tool_name", None)
-    if tool_name is not None:
-        tool_kwargs = getattr(ev, "tool_kwargs", None)
-        tool_id = getattr(ev, "tool_id", None)
+    if name == "ToolCallResult":
+        return f"ToolCallResult(name={ev.tool_name}, id={ev.tool_id}, output={ev.tool_output})"
 
-        if name == "ToolCallResult":
-            tool_output = getattr(ev, "tool_output", None)
-            raw_output = getattr(tool_output, "raw_output", None) if tool_output else None
-            is_error = getattr(tool_output, "is_error", None) if tool_output else None
-            return (
-                f"{name} tool_name={tool_name!r} tool_id={tool_id!r} "
-                f"tool_kwargs={tool_kwargs} is_error={is_error} "
-                f"raw_output={_safe_truncate(str(raw_output), limit=300)}"
-            )
-
-        return f"{name} tool_name={tool_name!r} tool_id={tool_id!r} tool_kwargs={tool_kwargs}"
-
-    if name == "AgentInput":
-        input_messages = getattr(ev, "input", None)
-        if isinstance(input_messages, list) and input_messages:
-            last = input_messages[-1]
-            content = getattr(last, "content", None)
-            if content is None and hasattr(last, "blocks") and last.blocks:
-                content = getattr(last.blocks[0], "text", None)
-            return f"{name} last_msg={_safe_truncate(str(content), limit=300)}"
-        return f"{name}"
-
-    if name == "AgentOutput":
-        response = getattr(ev, "response", None)
-        if response is not None:
-            return f"{name} response={_safe_truncate(str(response), limit=200)}"
-        return f"{name}"
-
-    return f"{name} {ev}"
+    return None
 
 
 async def _ensure_searcher_state(ctx: Context) -> None:
@@ -151,11 +123,11 @@ async def main() -> None:
         print("\n🤖 SearcherAgent running...")
         handler = searcher_agent.run(user_msg=user_msg, ctx=ctx)
 
-        events: list[object] = []
         try:
             async for ev in handler.stream_events():
-                events.append(ev)
-                print(f"Event: {_format_event(ev)}")
+                log_msg = _format_event(ev)
+                if log_msg:
+                    print(f"Event: {log_msg}")
         except asyncio.CancelledError:
             print("\n(Event stream cancelled)")
             raise
@@ -163,7 +135,6 @@ async def main() -> None:
         result = await handler
         print("\n🤖 Response:\n")
         print(str(result.response))
-        print(f"\n(Collected {len(events)} events)")
 
         state = await ctx.store.get_state()
         _print_state_snapshot(state)
