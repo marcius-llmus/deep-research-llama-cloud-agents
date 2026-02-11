@@ -2,19 +2,15 @@ import logging
 from typing import Annotated, List
 
 from llama_index.core.tools.tool_spec.base import BaseToolSpec
-from llama_index.core.workflow import Context
+from workflows import Context
 from pydantic import Field
 
 from deep_research.config import ResearchConfig
 from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.query_service import QueryService
 from deep_research.services.web_search_service import WebSearchService
-from deep_research.workflows.research.searcher.models import EvidenceBundle
 from deep_research.services.token_counting_service import TokenCountingService
-from deep_research.workflows.research.state_keys import (
-    ResearchStateKey,
-    StateNamespace,
-)
+from deep_research.workflows.research.state import DeepResearchState
 
 logger = logging.getLogger(__name__)
 
@@ -41,40 +37,6 @@ class SearcherTools(BaseToolSpec):
         self.query_service = query_service
         self.evidence_service = evidence_service
 
-    @staticmethod
-    def _get_seen_urls(state: dict) -> set[str]:
-        return set(map(str, state[StateNamespace.RESEARCH][ResearchStateKey.SEEN_URLS]))
-
-    @staticmethod
-    def _set_seen_urls(state: dict, seen: set[str]) -> None:
-        state[StateNamespace.RESEARCH][ResearchStateKey.SEEN_URLS] = sorted(seen)
-
-    @classmethod
-    def _add_seen_urls(cls, state: dict, urls: list[str]) -> None:
-        """Add URLs to the seen set, normalizing to strings and keeping state sorted."""
-
-        if not urls:
-            return
-
-        seen = cls._get_seen_urls(state)
-        seen.update(map(str, urls))
-        cls._set_seen_urls(state, seen)
-
-    @staticmethod
-    def _get_failed_urls(state: dict) -> set[str]:
-        return set(map(str, state[StateNamespace.RESEARCH][ResearchStateKey.FAILED_URLS]))
-
-    @staticmethod
-    def _set_failed_urls(state: dict, failed: set[str]) -> None:
-        state[StateNamespace.RESEARCH][ResearchStateKey.FAILED_URLS] = sorted(failed)
-
-    @classmethod
-    def _add_failed_urls(cls, state: dict, failures: list[str]) -> None:
-        if not failures:
-            return
-        failed = cls._get_failed_urls(state)
-        failed.update(map(str, failures))
-        cls._set_failed_urls(state, failed)
 
     async def decompose_query(
         self,
@@ -89,15 +51,15 @@ class SearcherTools(BaseToolSpec):
 
     async def web_search(
         self,
-        ctx: Context,
+        ctx: Context[DeepResearchState],
         query: Annotated[str, Field(description="Search query to run.")],
     ) -> str:
         """
         Performs a web search and returns a list of 10 results.
         """
-        state = await ctx.store.get_state()
-        seen_urls = self._get_seen_urls(state)
-        failed_urls = self._get_failed_urls(state)
+        state: DeepResearchState = await ctx.store.get_state()
+        seen_urls = set(map(str, state.research_turn.seen_urls))
+        failed_urls = set(map(str, state.research_turn.failed_urls))
 
         search_data, _requests_made = await self.web_search_service.search_google(
             query=query,
@@ -129,7 +91,7 @@ class SearcherTools(BaseToolSpec):
 
     async def generate_evidences(
         self,
-        ctx: Context,
+        ctx: Context[DeepResearchState],
         urls: Annotated[List[str], Field(description="URLs to read.")],
         directive: Annotated[str, Field(description="What to extract and why it matters.")],
     ) -> str:
@@ -137,10 +99,8 @@ class SearcherTools(BaseToolSpec):
         Reads content from a list of URLs in parallel, analyzes each for insights relevant to a directive,
         and returns a concise summary for each.
         """
-        state = await ctx.store.get_state()
-        research_state = state[StateNamespace.RESEARCH]
-        pending_raw = research_state[ResearchStateKey.PENDING_EVIDENCE]
-        pending = EvidenceBundle.model_validate(pending_raw)
+        state: DeepResearchState = await ctx.store.get_state()
+        pending = state.research_turn.evidence
 
         existing_total_tokens = TokenCountingService.count_tokens(
             "\n\n".join([(i.content or "") for i in pending.items])
@@ -154,16 +114,9 @@ class SearcherTools(BaseToolSpec):
         )
 
         async with ctx.store.edit_state() as state:
-            research_state = state[StateNamespace.RESEARCH]
-
-            self._add_failed_urls(state, failures)
-            self._add_seen_urls(state, [i.url for i in new_items] + list(failures))
-
-            pending_raw_edit = research_state[ResearchStateKey.PENDING_EVIDENCE]
-            pending_edit = EvidenceBundle.model_validate(pending_raw_edit)
-
-            pending_edit.items.extend(new_items)
-            research_state[ResearchStateKey.PENDING_EVIDENCE] = pending_edit.model_dump()
+            state.research_turn.add_failed_urls(list(failures))
+            state.research_turn.add_seen_urls([i.url for i in new_items] + list(failures))
+            state.research_turn.add_evidence_items(new_items)
 
         all_summaries = []
         for item in new_items:
@@ -189,21 +142,17 @@ class SearcherTools(BaseToolSpec):
 
     async def verify_research_sufficiency(
         self,
-        ctx: Context,
+        ctx: Context[DeepResearchState],
         query: Annotated[str, Field(description="The original user query to check against.")],
     ) -> str:
         """
         Checks if the gathered evidence is sufficient to answer the user's query.
         Returns an analysis of what is covered and what is missing.
         """
-        state = await ctx.store.get_state()
-        research_state = state[StateNamespace.RESEARCH]
-        pending = research_state[ResearchStateKey.PENDING_EVIDENCE]
-        items = pending["items"]
+        state: DeepResearchState = await ctx.store.get_state()
         evidence_summaries = [
-            f"Source: {item['url']}\n"
-            f"Summary: {item['summary']}"
-            for item in items
+            f"Source: {item.url}\nSummary: {item.summary}"
+            for item in state.research_turn.evidence.items
         ]
 
         evidence_text = "\n\n".join(evidence_summaries).strip()
@@ -217,16 +166,15 @@ class SearcherTools(BaseToolSpec):
 
     async def follow_up_query_generator(
         self,
-        ctx: Context,
+        ctx: Context[DeepResearchState],
         original_query: Annotated[str, Field(description="Original user query.")],
     ) -> str:
         """
         Based on the insights you've already collected, this tool generates new,
         specific follow-up questions to help you dig deeper into the research topic.
         """
-        state = await ctx.store.get_state()
-        pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
-        pending = EvidenceBundle.model_validate(pending_raw)
+        state: DeepResearchState = await ctx.store.get_state()
+        pending = state.research_turn.evidence
 
         insights: list[str] = []
         for item in pending.items:
@@ -238,6 +186,6 @@ class SearcherTools(BaseToolSpec):
         )
 
         async with ctx.store.edit_state() as state:
-            state[StateNamespace.RESEARCH][ResearchStateKey.FOLLOW_UP_QUERIES] = queries
+            state.research_turn.follow_up_queries = queries
 
         return "\n".join(f"- {q}" for q in queries)

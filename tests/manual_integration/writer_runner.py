@@ -6,7 +6,7 @@ from typing import Any
 from workflows import Context
 
 from deep_research.services.models import ParsedDocumentAsset
-from deep_research.workflows.research.state_keys import ReportStateKey, ReportStatus, StateNamespace
+from deep_research.workflows.research.state import DeepResearchState, ResearchArtifactStatus
 from deep_research.workflows.research.writer.agent import workflow as writer_agent
 
 
@@ -42,16 +42,6 @@ def _format_unified_diff(*, before: str, after: str, fromfile: str = "before", t
         tofile=tofile,
     )
     return "".join(diff_lines).strip()
-
-
-async def _ensure_writer_state(ctx: Context) -> None:
-    async with ctx.store.edit_state() as state:
-        if StateNamespace.REPORT not in state:
-            state[StateNamespace.REPORT] = {
-                ReportStateKey.PATH: "artifacts/report.md",
-                ReportStateKey.CONTENT: "",
-                ReportStateKey.STATUS: ReportStatus.RUNNING,
-            }
 
 
 def _build_fake_research_notes(topic: str) -> str:
@@ -151,18 +141,16 @@ def _build_writer_user_msg(*, instruction: str, research_notes: str, review_feed
     return user_msg
 
 
-def _print_report_snapshot(state: dict) -> None:
-    report = state.get(StateNamespace.REPORT, {})
-    content = report.get(ReportStateKey.CONTENT, "")
+def _print_report_snapshot(state: DeepResearchState) -> None:
+    content = state.research_artifact.content
 
     print("\n--- Report snapshot ---")
-    print(f"chars: {len(content or '')}")
-    print(f"status: {report.get(ReportStateKey.STATUS)}")
+    print(f"chars: {len(content)}")
+    print(f"status: {state.research_artifact.status}")
 
 
 async def main() -> None:
-    ctx = Context(writer_agent)
-    await _ensure_writer_state(ctx)
+    ctx: Context[DeepResearchState] = Context(writer_agent)
 
     topic = "Deep research report generation"
     research_notes = _build_fake_research_notes(topic)
@@ -211,22 +199,21 @@ async def main() -> None:
 
         if user_msg == "/report":
             state = await ctx.store.get_state()
-            content = state.get(StateNamespace.REPORT, {}).get(ReportStateKey.CONTENT, "")
+            content = state.research_artifact.content
             print("\n--- Current report ---\n")
             print(content)
             continue
 
         if user_msg == "/reset":
             async with ctx.store.edit_state() as state:
-                state[StateNamespace.REPORT][ReportStateKey.CONTENT] = ""
-                state[StateNamespace.REPORT][ReportStateKey.STATUS] = ReportStatus.RUNNING
+                state.research_artifact.content = ""
+                state.research_artifact.draft_content = ""
+                state.research_artifact.status = ResearchArtifactStatus.RUNNING
             print("Reset report state.")
             continue
 
-        await _ensure_writer_state(ctx)
-
         state_before = await ctx.store.get_state()
-        content_before = state_before.get(StateNamespace.REPORT, {}).get(ReportStateKey.CONTENT, "")
+        content_before = state_before.research_artifact.content
 
         print("\nWriterAgent running...")
         prompt = _build_writer_user_msg(
@@ -246,7 +233,7 @@ async def main() -> None:
         print(str(result.response))
 
         state = await ctx.store.get_state()
-        content = state.get(StateNamespace.REPORT, {}).get(ReportStateKey.CONTENT, "")
+        content = state.research_artifact.content
 
         diff_text = _format_unified_diff(
             before=content_before,

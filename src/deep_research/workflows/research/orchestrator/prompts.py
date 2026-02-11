@@ -1,10 +1,4 @@
-from deep_research.workflows.research.searcher.models import EvidenceBundle
-from deep_research.workflows.research.state_keys import (
-    OrchestratorStateKey,
-    StateNamespace,
-    ReportStateKey,
-    ResearchStateKey,
-)
+from deep_research.workflows.research.state import DeepResearchState
 
 ORCHESTRATOR_SYSTEM_TEMPLATE = """You are the Orchestrator for a deep research run.
 
@@ -46,9 +40,9 @@ call_research_agent(prompt: str) -> str
 - The Searcher gathers evidence (documents, text, images, tables/csv-like data when available) and updates the CURRENT EVIDENCE SUMMARY.
 - If the CURRENT EVIDENCE SUMMARY is not strong enough for your purpose, call the Searcher again with a refined prompt. The Searcher will expand evidence and produce an updated summary.
 
-call_write_agent(instruction: str) -> str
+call_write_agent(prompt: str) -> str
 - Use this when the CURRENT EVIDENCE SUMMARY is sufficient to update the report.
-- Your instruction must be specific and editorial:
+- Your prompt must be specific and editorial:
   - which plan item(s) this update satisfies
   - exactly what sections to add/update in the report
   - what structure to use (headings, bullet points, comparison tables, etc.)
@@ -79,12 +73,10 @@ Output policy:
 - Keep any non-tool text minimal and action-oriented.
 """
 
-def build_orchestrator_system_prompt(state: dict) -> str:
-    research_plan = state[StateNamespace.ORCHESTRATOR][OrchestratorStateKey.RESEARCH_PLAN]
-    report_content = state[StateNamespace.REPORT][ReportStateKey.CONTENT]
-
-    pending_raw = state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE]
-    evidence_summary = EvidenceBundle.model_validate(pending_raw).get_summary()
+def build_orchestrator_system_prompt(state: DeepResearchState) -> str:
+    research_plan = state.orchestrator.research_plan
+    report_content = state.research_artifact.content
+    evidence_summary = state.research_turn.evidence.get_summary()
 
     return ORCHESTRATOR_SYSTEM_TEMPLATE.format(
         research_plan=research_plan,

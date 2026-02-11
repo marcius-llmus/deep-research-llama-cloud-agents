@@ -5,14 +5,13 @@ from typing import Any
 from workflows import Context
 
 from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
-from deep_research.workflows.research.state_keys import ResearchStateKey, StateNamespace
+from deep_research.workflows.research.state import DeepResearchState, ResearchArtifactStatus
 
 
 def _redact_tool_kwargs(tool_kwargs: Any) -> Any:
     if not isinstance(tool_kwargs, dict):
         return tool_kwargs
     redacted = tool_kwargs.copy()
-    # Redact common large fields if they appear
     for key in ["diff", "content", "text"]:
         if key in redacted:
             val = redacted[key]
@@ -35,47 +34,29 @@ def _format_event(ev: Any) -> str | None:
     return None
 
 
-async def _ensure_searcher_state(ctx: Context) -> None:
-    """Initialize the minimal state required by SearcherTools.
-
-    The Searcher agent assumes the orchestrator has initialized shared state.
-    This helper enables running the Searcher agent standalone for debugging.
-    """
-
+async def _reset_searcher_state(ctx: Context[DeepResearchState]) -> None:
     async with ctx.store.edit_state() as state:
-        if StateNamespace.RESEARCH not in state:
-            state[StateNamespace.RESEARCH] = {}
-
-        research = state[StateNamespace.RESEARCH]
-        research.setdefault(ResearchStateKey.SEEN_URLS, [])
-        research.setdefault(ResearchStateKey.FAILED_URLS, [])
-        research.setdefault(
-            ResearchStateKey.PENDING_EVIDENCE,
-            {
-                "queries": [],
-                "items": [],
-            },
-        )
-        research.setdefault(ResearchStateKey.FOLLOW_UP_QUERIES, [])
+        state.orchestrator.research_plan = ""
+        state.research_turn.clear()
+        state.research_artifact.content = ""
+        state.research_artifact.draft_content = ""
+        state.research_artifact.status = ResearchArtifactStatus.RUNNING
 
 
-def _print_state_snapshot(state: dict) -> None:
-    research = state.get(StateNamespace.RESEARCH, {})
-    seen_urls = research.get(ResearchStateKey.SEEN_URLS, [])
-    pending = research.get(ResearchStateKey.PENDING_EVIDENCE, {})
-    items = pending.get("items", []) if isinstance(pending, dict) else []
-    follow_ups = research.get(ResearchStateKey.FOLLOW_UP_QUERIES, [])
+def _print_state_snapshot(state: DeepResearchState) -> None:
+    seen_urls = state.research_turn.seen_urls
+    items = state.research_turn.evidence.items
+    follow_ups = state.research_turn.follow_up_queries
 
     print("\n--- State snapshot ---")
     print(f"seen_urls: {len(seen_urls)}")
     print(f"pending_evidence.items: {len(items)}")
     print(f"follow_up_queries: {len(follow_ups)}")
-    # directive was removed from pending evidence state; it is passed as a one-time tool argument.
 
 
 async def main() -> None:
-    ctx = Context(searcher_agent)
-    await _ensure_searcher_state(ctx)
+    ctx: Context[DeepResearchState] = Context(searcher_agent)
+    await _reset_searcher_state(ctx)
 
     print(
         "Searcher agent iterative runner\n\n"
@@ -105,20 +86,9 @@ async def main() -> None:
             continue
 
         if user_msg == "/reset":
-            async with ctx.store.edit_state() as state:
-                state[StateNamespace.RESEARCH] = {
-                    ResearchStateKey.SEEN_URLS: [],
-                    ResearchStateKey.FAILED_URLS: [],
-                    ResearchStateKey.PENDING_EVIDENCE: {
-                        "queries": [],
-                        "items": [],
-                    },
-                    ResearchStateKey.FOLLOW_UP_QUERIES: [],
-                }
+            await _reset_searcher_state(ctx)
             print("Reset research state.")
             continue
-
-        await _ensure_searcher_state(ctx)
 
         print("\n🤖 SearcherAgent running...")
         handler = searcher_agent.run(user_msg=user_msg, ctx=ctx)

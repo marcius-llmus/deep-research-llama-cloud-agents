@@ -7,11 +7,7 @@ from pydantic import BaseModel, Field, create_model
 
 from deep_research.config import ResearchConfig
 from deep_research.services.report_patch_service import ReportPatchService
-from deep_research.workflows.research.state_keys import (
-    ReportStateKey,
-    ResearchStateKey,
-    StateNamespace,
-)
+from deep_research.workflows.research.state import DeepResearchState
 
 from deep_research.services.patch_prompts import (
     get_patch_format_instructions,
@@ -91,12 +87,11 @@ class WriterTools(BaseToolSpec):
 
     async def apply_patch(
         self,
-        ctx: Context,
+        ctx: Context[DeepResearchState],
         diff: str,
     ) -> str:
-        state = await ctx.store.get_state()
-        report_state = state[StateNamespace.REPORT]
-        current = report_state[ReportStateKey.CONTENT]
+        state: DeepResearchState = await ctx.store.get_state()
+        current = state.research_artifact.content
 
         new_content, added, removed = await self.report_patch_service.apply_patch(
             original_text=current,
@@ -104,17 +99,16 @@ class WriterTools(BaseToolSpec):
         )
 
         async with ctx.store.edit_state() as edit_state:
-            edit_state[StateNamespace.REPORT][ReportStateKey.DRAFT_CONTENT] = new_content
+            edit_state.research_artifact.draft_content = new_content
 
         return (
             f"Report patched. Added {added} lines, removed {removed} lines. Waiting for review."
         )
 
-    async def review_patch(self, ctx: Context) -> str: # noqa
+    async def review_patch(self, ctx: Context[DeepResearchState]) -> str: # noqa
         async with ctx.store.edit_state() as state:
-            report_state = state[StateNamespace.REPORT]
-            draft = report_state[ReportStateKey.DRAFT_CONTENT]
-            current = report_state[ReportStateKey.CONTENT]
+            draft = state.research_artifact.draft_content
+            current = state.research_artifact.content
 
             if not draft.strip():
                 return ReviewPatchResponse(
@@ -124,14 +118,9 @@ class WriterTools(BaseToolSpec):
 
             added, removed = _count_line_changes(old=current, new=draft)
 
-            report_state[ReportStateKey.CONTENT] = draft
-            report_state[ReportStateKey.DRAFT_CONTENT] = ""
-
-            state[StateNamespace.RESEARCH][ResearchStateKey.PENDING_EVIDENCE] = {
-                "queries": [],
-                "items": [],
-            }
-            state[StateNamespace.RESEARCH][ResearchStateKey.FOLLOW_UP_QUERIES] = []
+            state.research_artifact.content = draft
+            state.research_artifact.draft_content = ""
+            state.research_turn.clear()
 
         return ReviewPatchResponse(
             decision="approved",
