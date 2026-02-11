@@ -16,7 +16,7 @@ Each operation starts with one of three headers:
 
 Example patch:
 
-<example>
+```
  *** Begin Patch
  *** Update File: artifacts/report.md
  @@ -0,0 +1,3 @@
@@ -24,7 +24,7 @@ Example patch:
  +
  +## Overview
  *** End Patch
-</example>
+```
 
 It is important to remember:
 
