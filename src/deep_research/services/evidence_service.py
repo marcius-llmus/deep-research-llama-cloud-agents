@@ -2,7 +2,9 @@
 
 import asyncio
 import logging
+from pathlib import PurePosixPath
 from typing import List, Optional, Tuple
+from urllib.parse import urlparse
 
 from deep_research.services.content_analysis_service import ContentAnalysisService
 from deep_research.services.document_parser_service import DocumentParserService
@@ -70,7 +72,10 @@ class EvidenceService:
         # we upload the data to llama index so we can parse by id
         # this is also good because will allow research point to actual factual data from real docs
         upload_tasks = [
-            self.file_service.upload_bytes(content, filename=f"upload_{hash(url)}") 
+            self.file_service.upload_bytes(
+                content,
+                filename=self._build_upload_filename(url=url),
+            )
             for url, content in valid_downloads
         ]
         upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
@@ -118,6 +123,27 @@ class EvidenceService:
 
         return items, sorted(failures), budget_exhausted
 
+    @staticmethod
+    def _infer_suffix_from_url(*, url: str) -> str:
+        parsed = urlparse(url)
+        suffix = (PurePosixPath(parsed.path).suffix or "").lower()
+
+        if not suffix or any(ch in suffix for ch in ("/", "\\")):
+            return ".html"
+
+        if len(suffix) > 10:
+            return ".html"
+
+        if not suffix.startswith("."):
+            return ".html"
+
+        return suffix
+
+    @classmethod
+    def _build_upload_filename(cls, *, url: str) -> str:
+        suffix = cls._infer_suffix_from_url(url=url)
+        return f"upload_{abs(hash(url))}{suffix}"
+
     async def _process_evidence(
         self, evidence: ParsedDocument, directive: str
     ) -> Tuple[str, Optional[EvidenceItem], Optional[BaseException]]:
@@ -151,7 +177,6 @@ class EvidenceService:
                 title=evidence.metadata.get("title"),
                 content=evidence.markdown,
                 summary=summary,
-                relevance=relevance,
                 assets=selected_assets,
             )
             return evidence.source_url, item, None
