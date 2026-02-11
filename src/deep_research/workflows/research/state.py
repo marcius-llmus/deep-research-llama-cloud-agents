@@ -28,22 +28,16 @@ class ResearchTurnState(BaseModel):
         self.follow_up_queries = []
 
     def add_seen_urls(self, urls: list[str]) -> None:
-        if not urls:
-            return
         merged = set(self.seen_urls)
         merged.update(map(str, urls))
         self.seen_urls = sorted(merged)
 
     def add_failed_urls(self, urls: list[str]) -> None:
-        if not urls:
-            return
         merged = set(self.failed_urls)
         merged.update(map(str, urls))
         self.failed_urls = sorted(merged)
 
     def add_evidence_items(self, items: list[EvidenceItem]) -> None:
-        if not items:
-            return
         self.evidence.items.extend(items)
 
 
