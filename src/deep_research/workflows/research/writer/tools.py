@@ -95,7 +95,8 @@ class WriterTools(BaseToolSpec):
         diff: str,
     ) -> str:
         state = await ctx.store.get_state()
-        current = state[StateNamespace.REPORT].get(ReportStateKey.CONTENT, "")
+        report_state = state[StateNamespace.REPORT]
+        current = report_state.get(ReportStateKey.CONTENT, "")
 
         new_content, added, removed = await self.report_patch_service.apply_patch(
             original_text=current,
@@ -112,21 +113,13 @@ class WriterTools(BaseToolSpec):
     async def review_patch(self, ctx: Context) -> str: # noqa
         async with ctx.store.edit_state() as state:
             report_state = state[StateNamespace.REPORT]
-            draft = report_state.get(ReportStateKey.DRAFT_CONTENT)
+            draft = report_state.get(ReportStateKey.DRAFT_CONTENT, "")
             current = report_state.get(ReportStateKey.CONTENT, "")
 
-            if not (draft or "").strip():
-                report_state[ReportStateKey.DRAFT_CONTENT] = ""
+            if not draft.strip():
                 return ReviewPatchResponse(
                     decision="rejected",
-                    message="Draft content is empty. Cleared draft.",
-                ).model_dump_json()
-
-            if draft == current:
-                report_state[ReportStateKey.DRAFT_CONTENT] = ""
-                return ReviewPatchResponse(
-                    decision="rejected",
-                    message="Draft is identical to current report. Cleared draft.",
+                    message="Draft content is empty. Please apply a patch first.",
                 ).model_dump_json()
 
             added, removed = _count_line_changes(old=current, new=draft)
