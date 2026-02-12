@@ -55,8 +55,7 @@ def _print_state_snapshot(state: DeepResearchState) -> None:
 
 
 async def main() -> None:
-    ctx: Context[DeepResearchState] = Context(searcher_agent)
-    await _reset_searcher_state(ctx)
+    ctx = Context(searcher_agent)
 
     print(
         "Searcher agent iterative runner\n\n"

@@ -28,7 +28,7 @@ def _print_snapshot(state: DeepResearchState | None) -> None:
 
 
 async def main():
-    ctx: Context[DeepResearchState] = Context(orchestrator_workflow)
+    ctx = Context(orchestrator_workflow)
 
     print("Orchestrator E2E runner. Commands: /state /state_json /exit")
     while True:

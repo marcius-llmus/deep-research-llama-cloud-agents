@@ -150,7 +150,7 @@ def _print_report_snapshot(state: DeepResearchState) -> None:
 
 
 async def main() -> None:
-    ctx: Context[DeepResearchState] = Context(writer_agent)
+    ctx = Context(writer_agent)
 
     topic = "Deep research report generation"
     research_notes = _build_fake_research_notes(topic)
