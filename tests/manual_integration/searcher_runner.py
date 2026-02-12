@@ -34,7 +34,7 @@ def _format_event(ev: Any) -> str | None:
     return None
 
 
-async def _reset_searcher_state(ctx: Context[DeepResearchState]) -> None:
+async def _reset_searcher_state(ctx: Context) -> None:
     async with ctx.store.edit_state() as state:
         state.orchestrator.research_plan = ""
         state.research_turn.clear()

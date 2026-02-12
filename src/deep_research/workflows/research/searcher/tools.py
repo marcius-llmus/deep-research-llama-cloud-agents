@@ -51,7 +51,7 @@ class SearcherTools(BaseToolSpec):
 
     async def web_search(
         self,
-        ctx: Context[DeepResearchState],
+        ctx: Context,
         query: Annotated[str, Field(description="Search query to run.")],
     ) -> str:
         """
@@ -91,7 +91,7 @@ class SearcherTools(BaseToolSpec):
 
     async def generate_evidences(
         self,
-        ctx: Context[DeepResearchState],
+        ctx: Context,
         urls: Annotated[List[str], Field(description="URLs to read.")],
         directive: Annotated[str, Field(description="What to extract and why it matters.")],
     ) -> str:
@@ -142,7 +142,7 @@ class SearcherTools(BaseToolSpec):
 
     async def verify_research_sufficiency(
         self,
-        ctx: Context[DeepResearchState],
+        ctx: Context,
         query: Annotated[str, Field(description="The original user query to check against.")],
     ) -> str:
         """
@@ -166,7 +166,7 @@ class SearcherTools(BaseToolSpec):
 
     async def follow_up_query_generator(
         self,
-        ctx: Context[DeepResearchState],
+        ctx: Context,
         original_query: Annotated[str, Field(description="Original user query.")],
     ) -> str:
         """

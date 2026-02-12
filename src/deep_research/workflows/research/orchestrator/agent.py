@@ -23,7 +23,7 @@ llm_cfg = cfg.orchestrator.main_llm
 llm = GoogleGenAI(model=llm_cfg.model, temperature=llm_cfg.temperature)
 
 
-async def call_research_agent(ctx: Context[DeepResearchState], prompt: str) -> str:
+async def call_research_agent(ctx: Context, prompt: str) -> str:
     print(f"Orchestrator -> SearcherAgent: {prompt}")
 
     await searcher_agent.run(
@@ -35,7 +35,7 @@ async def call_research_agent(ctx: Context[DeepResearchState], prompt: str) -> s
         return state.research_turn.evidence.get_summary()
 
 
-async def call_write_agent(ctx: Context[DeepResearchState], instruction: str) -> str:
+async def call_write_agent(ctx: Context, instruction: str) -> str:
     print(f"Orchestrator -> WriteAgent: {instruction}")
 
     async with ctx.store.edit_state() as state:
@@ -60,7 +60,7 @@ class OrchestratorWorkflow(Workflow):
     """
 
     @staticmethod
-    async def _initialize_state(ctx: Context[DeepResearchState], plan_text: str) -> None:
+    async def _initialize_state(ctx: Context, plan_text: str) -> None:
         async with ctx.store.edit_state() as state:
             state.orchestrator.research_plan = plan_text
             state.research_turn.clear()
@@ -69,7 +69,7 @@ class OrchestratorWorkflow(Workflow):
             state.research_artifact.status = ResearchArtifactStatus.RUNNING
 
     @step
-    async def run_orchestrator(self, ev: StartEvent, ctx: Context[DeepResearchState]) -> StopEvent:
+    async def run_orchestrator(self, ev: StartEvent, ctx: Context) -> StopEvent:
         user_msg = str(ev.user_msg)
         await self._initialize_state(ctx, user_msg)
 

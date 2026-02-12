@@ -87,7 +87,7 @@ class WriterTools(BaseToolSpec):
 
     async def apply_patch(
         self,
-        ctx: Context[DeepResearchState],
+        ctx: Context,
         diff: str,
     ) -> str:
         state: DeepResearchState = await ctx.store.get_state()
@@ -105,7 +105,7 @@ class WriterTools(BaseToolSpec):
             f"Report patched. Added {added} lines, removed {removed} lines. Waiting for review."
         )
 
-    async def review_patch(self, ctx: Context[DeepResearchState]) -> str: # noqa
+    async def review_patch(self, ctx: Context) -> str: # noqa
         async with ctx.store.edit_state() as state:
             draft = state.research_artifact.draft_content
             current = state.research_artifact.content
