@@ -15,19 +15,17 @@ GUARDRAILS_SECTION_TMPL = """\
 
 To ensure efficient research, you must also adhere to these rules:
 
+### Snippets vs Content
+- **Snippets are NOT Evidence:** Search snippets are often vague or incomplete. You CANNOT judge if a source is sufficient based on the snippet alone.
+- **Read Immediately:** If `web_search` returns URLs that seem even remotely relevant to your query, you MUST call `generate_evidences` on them immediately.
+- **Do Not Re-Search:** Do NOT perform a second `web_search` based on the belief that the first search's snippets were "too generic". Read the pages first. The details you need are inside the content, not the snippet.
+
 ### Query handling
-- **Do not rewrite queries:** You MUST NOT add constraints that the user did not explicitly ask for.
-  - Do NOT add dates/years (e.g., "February 2026"), "current", "today", "latest", or event context (e.g., "inauguration", "election") unless the user explicitly included them.
-- **Decompose before searching:** Before your FIRST `web_search` in a run, you MUST call `decompose_query` with the user's original query.
-- **Use returned queries verbatim:** For subsequent `web_search` calls, copy/paste one of the returned decomposed queries EXACTLY (no rewording).
+- **Decompose first:** Always start by decomposing the user's request.
+- **Verbatim queries:** Use the decomposed queries exactly as provided.
 
 ### Workflow efficiency
-- **Avoid Search Loops:** After using `web_search`, prioritize reading sources with `generate_evidences` before searching again. Do not perform more than 3 consecutive `web_search` actions.
-- **Process in Batches:** When using `generate_evidences`, provide a list of URLs. Do not attempt to read more than 5 URLs in a single action.
-- **Efficient Reading:** The `web_search` tool will mark URLs with `(already seen)` when they were already processed.
-- **Verify Order:** Do not call `verify_research_sufficiency` immediately after `web_search`. You must first call `generate_evidences` at least once.
-
-### No-new-results fallback
+- **Process in Batches:** When using `generate_evidences`, provide a list of URLs.
 - If `web_search` returns **no new results** or all results are with tag of seen/failed URLs, you MUST NOT keep retrying the same query.
 - Instead, call `follow_up_query_generator` using the user's original query to produce new angles, then run `web_search` using one of the returned follow-up queries.
 """
@@ -40,17 +38,19 @@ STATE_SECTION_TMPL = """\
 WORKFLOW_SECTION_TMPL = """\
 ## Deep Research Workflow
 
-For complex research tasks that require gathering and analyzing information from the web, you MUST follow this structured process:
+You are a data collector. Your Orchestrator is the "Brain"; you are the "Hand".
 
-1.  **Search:** Use `web_search` to find relevant sources.
-2.  **Process Sources:** Use `generate_evidences` with a clear `directive` to download, parse, and enrich the content from the URLs found. Prefer batches of URLs.
-3.  **Verify:** Use `verify_research_sufficiency` to check if you have enough information.
-4.  **Iterate:** Repeat steps (1-3) until the verification tool confirms sufficiency.
-5.  **Finalize:** Use `finalize_research` to complete the task.
+1.  **Decompose:** Break the user's intent into specific search queries.
+2.  **Search:** Run `web_search` for a query.
+3.  **Capture (Mandatory):** Immediately pass the new URLs to `generate_evidences`. Do not analyze the snippets; analyze the *content* returned by this tool.
+4.  **Check Coverage:** Look at the summaries and **Relevance Scores** returned by `generate_evidences`.
+    - If Relevance is high (>0.7) for your topics, you have succeeded.
+    - If Relevance is low, ONLY THEN should you generate a follow-up query.
+5.  **Finalize:** When you have high-relevance evidence for the decomposed queries, call `finalize_research`.
 
 Your final response to the user MUST be produced by calling `finalize_research`. Do NOT repeat the findings in your response; they are automatically stored."""
 
-def build_research_system_prompt(config: ResearchConfig) -> str:
+def build_research_system_prompt() -> str:
     """Assembles and formats the complete system prompt."""
     
     current_date_str = date.today().isoformat()
