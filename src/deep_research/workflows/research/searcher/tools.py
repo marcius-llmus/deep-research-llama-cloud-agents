@@ -189,3 +189,35 @@ class SearcherTools(BaseToolSpec):
             state.research_turn.follow_up_queries = queries
 
         return "\n".join(f"- {q}" for q in queries)
+
+    # in order to return direct, it doesn't go in spec_functions
+    @staticmethod
+    async def finalize_research(ctx: Context) -> str:
+        state = await ResearchStateAccessor.get(ctx)
+        items = state.research_turn.evidence.items
+
+        total_items = len(items)
+        seen_urls = len(state.research_turn.seen_urls)
+        failed_urls = len(state.research_turn.failed_urls)
+        follow_up_queries = len(state.research_turn.follow_up_queries)
+
+        image_assets = 0
+        other_assets = 0
+        for item in items:
+            for asset in item.assets:
+                if asset.type == "image":
+                    image_assets += 1
+                else:
+                    other_assets += 1
+
+        return (
+            "Searcher agent has finished collecting evidences.\n\n"
+            "Evidence\n"
+            f"- Total items: {total_items}\n"
+            f"- Seen URLs: {seen_urls}\n"
+            f"- Failed URLs: {failed_urls}\n"
+            f"- Follow-up queries: {follow_up_queries}\n\n"
+            "Assets\n"
+            f"- Images selected: {image_assets}\n"
+            f"- Other assets selected: {other_assets}\n"
+        )

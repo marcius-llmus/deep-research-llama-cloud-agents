@@ -18,7 +18,7 @@ To ensure efficient research, you must also adhere to these rules:
 ### Query handling
 - **Do not rewrite queries:** You MUST NOT add constraints that the user did not explicitly ask for.
   - Do NOT add dates/years (e.g., "February 2026"), "current", "today", "latest", or event context (e.g., "inauguration", "election") unless the user explicitly included them.
-- **Decompose before searching:** Before your FIRST `web_search` in a run, you MUST call `optimized_query_generator` with the user's original query.
+- **Decompose before searching:** Before your FIRST `web_search` in a run, you MUST call `decompose_query` with the user's original query.
 - **Use returned queries verbatim:** For subsequent `web_search` calls, copy/paste one of the returned decomposed queries EXACTLY (no rewording).
 
 ### Workflow efficiency
@@ -48,7 +48,7 @@ For complex research tasks that require gathering and analyzing information from
 4.  **Iterate:** Repeat steps (1-3) until the verification tool confirms sufficiency.
 5.  **Finalize:** Use `finalize_research` to complete the task.
 
-Your final response to the user MUST be short and simple (e.g., "Research complete."). Do NOT repeat the findings in your response; they are automatically stored."""
+Your final response to the user MUST be produced by calling `finalize_research`. Do NOT repeat the findings in your response; they are automatically stored."""
 
 def build_research_system_prompt(config: ResearchConfig) -> str:
     """Assembles and formats the complete system prompt."""

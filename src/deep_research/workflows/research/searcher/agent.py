@@ -10,6 +10,7 @@ from deep_research.services.file_service import FileService
 from deep_research.services.query_service import QueryService
 from deep_research.services.content_analysis_service import ContentAnalysisService
 from llama_index.llms.google_genai import GoogleGenAI
+from llama_index.core.tools import FunctionTool
 
 cfg = load_config_from_json(
     model=ResearchConfig,
@@ -47,6 +48,13 @@ tools_spec = SearcherTools(
     evidence_service=evidence_service,
 )
 tools = tools_spec.to_tool_list()
+
+finalize_tool = FunctionTool.from_defaults(
+    fn=tools_spec.finalize_research,
+    return_direct=True,
+)
+tools.append(finalize_tool)
+
 system_prompt = build_research_system_prompt(cfg)
 
 workflow = FunctionAgent(
