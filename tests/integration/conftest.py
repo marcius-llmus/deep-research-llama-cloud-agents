@@ -226,7 +226,13 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
             
             # Pretty print tool call
             print(f"\n🔨 ToolCall: {tool_name}", flush=True)
-            # print(f"   Kwargs: {json.dumps(tool_kwargs, default=str)}", flush=True)
+            
+            if "query" in tool_kwargs:
+                print(f"   Query: {tool_kwargs['query']}", flush=True)
+            elif "original_query" in tool_kwargs:
+                print(f"   Query: {tool_kwargs['original_query']}", flush=True)
+            elif "urls" in tool_kwargs:
+                print(f"   URLs: {len(tool_kwargs['urls'])} items", flush=True)
 
             events.append(
                 ToolEvent(
