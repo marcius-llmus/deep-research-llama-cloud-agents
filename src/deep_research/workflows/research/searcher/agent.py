@@ -55,7 +55,7 @@ finalize_tool = FunctionTool.from_defaults(
 )
 tools.append(finalize_tool)
 
-system_prompt = build_research_system_prompt(cfg)
+system_prompt = build_research_system_prompt()
 
 workflow = FunctionAgent(
     name="SearcherAgent",
