@@ -48,4 +48,5 @@ workflow = FunctionAgent(
     system_prompt=system_prompt,
     llm=llm,
     tools=tools,
+    timeout=None,
 )
