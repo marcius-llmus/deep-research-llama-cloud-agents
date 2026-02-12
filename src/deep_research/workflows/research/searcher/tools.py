@@ -68,24 +68,60 @@ class SearcherTools(BaseToolSpec):
         if not search_data:
             return "No results found for this query."
 
-        formatted_results: list[str] = []
+        new_results: list[dict] = []
+        ignored_count = 0
+        for item in search_data:
+            if not (url := item.get("url").strip()):
+                continue
+            if url in seen_urls or url in failed_urls:
+                ignored_count += 1
+                continue
+            new_results.append(item)
 
-        for idx, item in enumerate(search_data, 1):
-            title = item.get("title", "")
-            url = item.get("url", "")
-            snippet = item.get("desc", "") or item.get("snippet", "")
+        if new_results:
+            async with ResearchStateAccessor.edit(ctx) as state:
+                state.research_turn.add_seen_urls([r["url"] for r in new_results])
 
-            is_ignored = url in seen_urls or url in failed_urls
-            url_line = f"    URL: {url}"
-            if is_ignored:
-                url_line += " (already seen/failed - ignore)"
-
-            formatted_results.append(
-                f"[{idx}] Title: {title}\n{url_line}\n    Snippet: {snippet}"
+        if not new_results:
+            return self._format_no_new_results_message(
+                seen_urls=len(seen_urls),
+                failed_urls=len(failed_urls),
             )
 
-        if not formatted_results:
-            return f"No results found for query: {query!r}."
+        return self._format_search_results(
+            results=new_results,
+            ignored_count=ignored_count,
+        )
+
+    @staticmethod
+    def _format_no_new_results_message(*, seen_urls: int, failed_urls: int) -> str:
+        return (
+            "NO_NEW_RESULTS\n"
+            "All results for this query are already seen/failed.\n"
+            f"Seen URLs: {seen_urls} | Failed URLs: {failed_urls}\n\n"
+            "You must choose one:\n"
+            "1) call follow_up_query_generator(original_query=...) to generate a new angle, then web_search using one of those queries verbatim\n"
+            "2) call finalize_research if evidence is already sufficient"
+        )
+
+    @staticmethod
+    def _format_search_results(*, results: list[dict], ignored_count: int) -> str:
+        formatted_results: list[str] = []
+        for idx, item in enumerate(results, 1):
+            title = (item.get("title") or "").strip()
+            url = (item.get("url") or "").strip()
+            snippet = (item.get("desc") or item.get("snippet") or "").strip()
+
+            formatted_results.append(
+                f"[{idx}] Title: {title}\n"
+                f"    URL: {url}\n"
+                f"    Snippet: {snippet}"
+            )
+
+        if ignored_count:
+            formatted_results.append(
+                f"(Ignored {ignored_count} already seen/failed results)"
+            )
 
         return "\n\n".join(formatted_results)
 
