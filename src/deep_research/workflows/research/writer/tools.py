@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field, create_model
 
 from deep_research.config import ResearchConfig
 from deep_research.services.report_patch_service import ReportPatchService
-from deep_research.workflows.research.state import DeepResearchState
+from deep_research.workflows.research.state import DeepResearchState, ResearchStateAccessor
 
 from deep_research.services.patch_prompts import (
     get_patch_format_instructions,
@@ -90,7 +90,7 @@ class WriterTools(BaseToolSpec):
         ctx: Context,
         diff: str,
     ) -> str:
-        state: DeepResearchState = await ctx.store.get_state()
+        state = await ResearchStateAccessor.get(ctx)
         current = state.research_artifact.content
 
         new_content, added, removed = await self.report_patch_service.apply_patch(
@@ -98,7 +98,7 @@ class WriterTools(BaseToolSpec):
             patch_text=diff,
         )
 
-        async with ctx.store.edit_state() as edit_state:
+        async with ResearchStateAccessor.edit(ctx) as edit_state:
             edit_state.research_artifact.draft_content = new_content
 
         return (
@@ -106,7 +106,7 @@ class WriterTools(BaseToolSpec):
         )
 
     async def review_patch(self, ctx: Context) -> str: # noqa
-        async with ctx.store.edit_state() as state:
+        async with ResearchStateAccessor.edit(ctx) as state:
             draft = state.research_artifact.draft_content
             current = state.research_artifact.content
 

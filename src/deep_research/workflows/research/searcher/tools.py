@@ -10,7 +10,7 @@ from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.query_service import QueryService
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.services.token_counting_service import TokenCountingService
-from deep_research.workflows.research.state import DeepResearchState
+from deep_research.workflows.research.state import ResearchStateAccessor
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ class SearcherTools(BaseToolSpec):
         """
         Performs a web search and returns a list of 10 results.
         """
-        state: DeepResearchState = await ctx.store.get_state()
+        state = await ResearchStateAccessor.get(ctx)
         seen_urls = set(map(str, state.research_turn.seen_urls))
         failed_urls = set(map(str, state.research_turn.failed_urls))
 
@@ -99,7 +99,7 @@ class SearcherTools(BaseToolSpec):
         Reads content from a list of URLs in parallel, analyzes each for insights relevant to a directive,
         and returns a concise summary for each.
         """
-        state: DeepResearchState = await ctx.store.get_state()
+        state = await ResearchStateAccessor.get(ctx)
         pending = state.research_turn.evidence
 
         existing_total_tokens = TokenCountingService.count_tokens(
@@ -113,7 +113,7 @@ class SearcherTools(BaseToolSpec):
             existing_total_tokens=existing_total_tokens,
         )
 
-        async with ctx.store.edit_state() as state:
+        async with ResearchStateAccessor.edit(ctx) as state:
             state.research_turn.add_failed_urls(list(failures))
             state.research_turn.add_seen_urls([i.url for i in new_items] + list(failures))
             state.research_turn.add_evidence_items(new_items)
@@ -149,7 +149,7 @@ class SearcherTools(BaseToolSpec):
         Checks if the gathered evidence is sufficient to answer the user's query.
         Returns an analysis of what is covered and what is missing.
         """
-        state: DeepResearchState = await ctx.store.get_state()
+        state = await ResearchStateAccessor.get(ctx)
         evidence_summaries = [
             f"Source: {item.url}\nSummary: {item.summary}"
             for item in state.research_turn.evidence.items
@@ -173,7 +173,7 @@ class SearcherTools(BaseToolSpec):
         Based on the insights you've already collected, this tool generates new,
         specific follow-up questions to help you dig deeper into the research topic.
         """
-        state: DeepResearchState = await ctx.store.get_state()
+        state = await ResearchStateAccessor.get(ctx)
         pending = state.research_turn.evidence
 
         insights: list[str] = []
@@ -185,7 +185,7 @@ class SearcherTools(BaseToolSpec):
             original_query=original_query,
         )
 
-        async with ctx.store.edit_state() as state:
+        async with ResearchStateAccessor.edit(ctx) as state:
             state.research_turn.follow_up_queries = queries
 
         return "\n".join(f"- {q}" for q in queries)

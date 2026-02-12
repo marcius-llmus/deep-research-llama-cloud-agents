@@ -1,6 +1,9 @@
 from enum import StrEnum
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
 
 from pydantic import BaseModel, Field
+from workflows import Context
 
 from deep_research.workflows.research.searcher.models import EvidenceBundle, EvidenceItem
 
@@ -52,3 +55,23 @@ class DeepResearchState(BaseModel):
     orchestrator: OrchestratorState = Field(default_factory=OrchestratorState)
     research_turn: ResearchTurnState = Field(default_factory=ResearchTurnState)
     research_artifact: ResearchArtifactState = Field(default_factory=ResearchArtifactState)
+
+
+class ResearchStateAccessor:
+    KEY = "deep_research_state"
+
+    @classmethod
+    async def get(cls, ctx: Context) -> DeepResearchState:
+        """Read-only access to typed state."""
+        data = await ctx.store.get(cls.KEY, default={})
+        return DeepResearchState.model_validate(data)
+
+    @classmethod
+    @asynccontextmanager
+    async def edit(cls, ctx: Context) -> AsyncIterator[DeepResearchState]:
+        """Read-write access to typed state (atomic)."""
+        async with ctx.store.edit_state() as store:
+            raw = store.get(cls.KEY, {})
+            state = DeepResearchState.model_validate(raw)
+            yield state
+            store[cls.KEY] = state.model_dump()

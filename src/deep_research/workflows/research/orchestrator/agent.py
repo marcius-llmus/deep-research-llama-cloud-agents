@@ -6,7 +6,7 @@ from deep_research.config import ResearchConfig
 from deep_research.utils import load_config_from_json
 from llama_index.llms.google_genai import GoogleGenAI
 
-from deep_research.workflows.research.state import DeepResearchState, ResearchArtifactStatus
+from deep_research.workflows.research.state import DeepResearchState, ResearchArtifactStatus, ResearchStateAccessor
 from deep_research.workflows.research.orchestrator.prompts import build_orchestrator_system_prompt
 
 from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
@@ -31,15 +31,15 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
         ctx=ctx,
     )
 
-    async with ctx.store.edit_state() as state:
-        return state.research_turn.evidence.get_summary()
+    state = await ResearchStateAccessor.get(ctx)
+    return state.research_turn.evidence.get_summary()
 
 
 async def call_write_agent(ctx: Context, instruction: str) -> str:
     print(f"Orchestrator -> WriteAgent: {instruction}")
 
-    async with ctx.store.edit_state() as state:
-        evidence_text = state.research_turn.evidence.get_content_for_writing()
+    state = await ResearchStateAccessor.get(ctx)
+    evidence_text = state.research_turn.evidence.get_content_for_writing()
 
     user_msg = "Update the report based on the following research notes and instructions.\n\n"
     user_msg += f"Research Notes:\n<research_notes>{evidence_text}</research_notes>\n\n"
@@ -59,23 +59,16 @@ class OrchestratorWorkflow(Workflow):
     injecting the current state (Report + Evidence) into the system prompt.
     """
 
-    @staticmethod
-    async def _initialize_state(ctx: Context, plan_text: str) -> None:
-        async with ctx.store.edit_state() as state:
-            state.orchestrator.research_plan = plan_text
-            state.research_turn.clear()
-
-            state.research_artifact.path = "artifacts/report.md"
-            state.research_artifact.status = ResearchArtifactStatus.RUNNING
-
     @step
-    async def run_orchestrator(self, ev: StartEvent, ctx: Context) -> StopEvent:
-        user_msg = str(ev.user_msg)
-        await self._initialize_state(ctx, user_msg)
+    async def run_orchestrator(self, ctx: Context, ev: StartEvent) -> StopEvent:
+        plan_text = str(ev.user_msg)
 
-        async with ctx.store.edit_state() as state:
-            dynamic_system_prompt = build_orchestrator_system_prompt(state)
-        
+        async with ResearchStateAccessor.edit(ctx) as state:
+            state.orchestrator.research_plan = plan_text
+            current_state = state.model_copy()
+
+        dynamic_system_prompt = build_orchestrator_system_prompt(current_state)
+
         agent = FunctionAgent(
             name="Orchestrator",
             description="Manages the report generation process.",
@@ -83,8 +76,8 @@ class OrchestratorWorkflow(Workflow):
             llm=llm,
             tools=[research_tool, write_tool],
         )
-        
-        result = await agent.run(user_msg="Start the research")
+
+        result = await agent.run(user_msg="Start the research", ctx=ctx)
         return StopEvent(result=result)
 
 workflow = OrchestratorWorkflow(timeout=None)
