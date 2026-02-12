@@ -1,5 +1,4 @@
 from datetime import date
-from deep_research.config import ResearchConfig
 
 SYSTEM_HEADER = """You are an expert research assistant. Your primary goal is to conduct in-depth, iterative research to gather comprehensive and accurate information on a given topic."""
 
