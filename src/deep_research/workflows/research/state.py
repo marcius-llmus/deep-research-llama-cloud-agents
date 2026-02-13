@@ -49,7 +49,8 @@ class ResearchTurnState(BaseModel):
 class ResearchArtifactState(BaseModel):
     path: str = "artifacts/report.md"
     content: str = ""
-    draft_content: str = ""
+    turn_draft: str | None = None
+    pending_patch_content: str | None = None
     status: ResearchArtifactStatus = ResearchArtifactStatus.RUNNING
 
 
