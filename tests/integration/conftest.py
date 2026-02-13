@@ -8,6 +8,8 @@ from typing import Any, Callable, Coroutine
 import pytest
 from workflows import Context
 
+from llama_index.llms.google_genai import GoogleGenAI
+
 from deep_research.services.document_parser_service import DocumentParserService
 from deep_research.services.file_service import FileService
 from deep_research.services.models import ParsedDocument
@@ -33,7 +35,8 @@ def use_real_llm() -> bool:
 @pytest.fixture
 def canned_serp() -> list[dict[str, Any]]:
     return [
-        # Energy Density
+        # --- BATTERIES (Solid State vs Li-ion) ---
+        # High Relevance
         {
             "title": "Solid-State Batteries: The Future of Energy Storage?",
             "url": "https://tech-example.com/solid-state",
@@ -42,20 +45,18 @@ def canned_serp() -> list[dict[str, Any]]:
         {
             "title": "Lithium-Ion Batteries Explained",
             "url": "https://energy-example.com/li-ion",
-            "desc": "Lithium-ion batteries are the standard. Energy density tops out around 250-300 Wh/kg.",
+            "desc": "Lithium-ion batteries are the standard. Energy density tops out around 250-300 Wh/kg. Thermal runaway is a risk.",
         },
-        # Safety
         {
             "title": "Battery Safety: Solid State vs Liquid Electrolyte",
             "url": "https://safety-example.org/battery-safety",
-            "desc": "Liquid electrolytes in Li-ion are flammable. Solid electrolytes are non-flammable, reducing thermal runaway risk.",
+            "desc": "Liquid electrolytes in Li-ion are flammable. Solid electrolytes are non-flammable, reducing thermal runaway risk significantly.",
         },
         {
             "title": "Thermal Runaway in EV Batteries",
             "url": "https://ev-safety.com/thermal-runaway",
             "desc": "Analysis of fire risks in modern EVs. Comparison of BMS systems and cell chemistry safety profiles.",
         },
-        # Cost / Market
         {
             "title": "The Cost of Battery Manufacturing 2025",
             "url": "https://market-example.net/battery-cost",
@@ -66,13 +67,135 @@ def canned_serp() -> list[dict[str, Any]]:
             "url": "https://tech-news.com/quantumscape",
             "desc": "Updates on solid-state commercialization. Challenges in dendrite formation and manufacturing throughput.",
         },
+        # Medium Relevance / Niche
+        {
+            "title": "Toyota's Solid State Roadmap",
+            "url": "https://auto-news.com/toyota-battery",
+            "desc": "Toyota plans to launch solid-state EVs by 2027. Focus on charging speed (10 mins) and range (1200km).",
+        },
+        {
+            "title": "Recycling Lithium-Ion Batteries",
+            "url": "https://green-tech.org/recycling",
+            "desc": "New methods for recovering cobalt and lithium from spent EV packs. Circular economy impact.",
+        },
+        {
+            "title": "Sodium-Ion: The Cheaper Alternative?",
+            "url": "https://chem-daily.com/sodium-ion",
+            "desc": "Sodium-ion batteries are cheaper than Li-ion but have lower energy density. Good for grid storage.",
+        },
+        
+        # --- AI MODELS (LLMs, Diffusion) ---
+        {
+            "title": "GPT-4 Architecture Leaks and Speculation",
+            "url": "https://ai-insider.com/gpt4-arch",
+            "desc": "Rumors of Mixture of Experts (MoE) architecture. 1.8 trillion parameters total.",
+        },
+        {
+            "title": "Training Costs of Large Language Models",
+            "url": "https://compute-daily.com/training-costs",
+            "desc": "Training a frontier model now costs over $100M in compute. H100 GPU shortages continue.",
+        },
+        {
+            "title": "Stable Diffusion vs Midjourney",
+            "url": "https://art-tech.net/sd-vs-mj",
+            "desc": "Comparison of open-source vs closed-source image generation models. ControlNet usage.",
+        },
+        {
+            "title": "The Ethics of AI Alignment",
+            "url": "https://philosophy-ai.org/alignment",
+            "desc": "RLHF and Constitutional AI. How to prevent models from generating harmful content.",
+        },
+
+        # --- CLIMATE CHANGE ---
+        {
+            "title": "IPCC Report 2024 Summary",
+            "url": "https://climate-watch.org/ipcc-2024",
+            "desc": "Global temperatures have risen 1.2C. Urgent action needed to stay below 1.5C.",
+        },
+        {
+            "title": "Carbon Capture Technologies",
+            "url": "https://engineering-green.com/ccs",
+            "desc": "Direct Air Capture (DAC) vs Point Source Capture. Costs are still prohibitive ($600/ton).",
+        },
+        {
+            "title": "Renewable Energy Growth in Asia",
+            "url": "https://energy-stats.com/asia-renewables",
+            "desc": "Solar and wind adoption in China and India is outpacing expectations.",
+        },
+
+        # --- DISTRACTORS / IRRELEVANT ---
+        {
+            "title": "Best Solid State Drives (SSD) for Gaming 2024",
+            "url": "https://pc-gamer.com/best-ssd",
+            "desc": "Top NVMe drives from Samsung and WD. Load times comparison.",
+        },
+        {
+            "title": "Lithium Mining Stocks to Watch",
+            "url": "https://finance-daily.com/lithium-stocks",
+            "desc": "Investment advice for the EV boom. Albemarle and SQM analysis.",
+        },
+        {
+            "title": "How to Bake a Solid Cake",
+            "url": "https://cooking-blog.com/solid-cake",
+            "desc": "Recipes for dense, moist cakes. Tips for baking at high altitude.",
+        },
+
+        # --- DOJ / NEWS ---
+        {
+            "title": "DOJ Press Release: Example Enforcement Action",
+            "url": "https://justice-example.gov/press/doj-enforcement",
+            "desc": "Department of Justice announces an enforcement action. Official press release.",
+        },
+        {
+            "title": "DOJ Newsroom Updates",
+            "url": "https://justice-example.gov/news",
+            "desc": "Latest DOJ newsroom updates and announcements.",
+        },
+
+        # --- WEATHER (Tokyo seasons) ---
+        {
+            "title": "Tokyo Weather in Spring (March-May)",
+            "url": "https://weather-example.com/tokyo-spring",
+            "desc": "Typical temperatures, rainfall, and conditions in Tokyo during spring.",
+        },
+        {
+            "title": "Tokyo Weather in Summer (June-August)",
+            "url": "https://weather-example.com/tokyo-summer",
+            "desc": "Hot and humid season, rainy period, and typical temperature ranges.",
+        },
+        {
+            "title": "Tokyo Weather in Autumn (September-November)",
+            "url": "https://weather-example.com/tokyo-autumn",
+            "desc": "Comfortable temperatures and precipitation patterns for Tokyo in autumn.",
+        },
+        {
+            "title": "Tokyo Weather in Winter (December-February)",
+            "url": "https://weather-example.com/tokyo-winter",
+            "desc": "Cool and dry season details including average lows and highs.",
+        },
+
+        # --- GITHUB / SITE OPERATOR ---
+        {
+            "title": "deep-research-agent repository",
+            "url": "https://github.com/example/deep-research-agent",
+            "desc": "Repository containing a deep research agent example.",
+        },
+
+        # --- FILETYPE:PDF / TESLA REPORT ---
+        {
+            "title": "Tesla Annual Report 2023 (PDF)",
+            "url": "https://reports-example.com/tesla-annual-report-2023.pdf",
+            "desc": "Annual report for Tesla (2023). PDF document.",
+        },
     ]
 
 
 @pytest.fixture
 def canned_pages() -> dict[str, bytes]:
-    return {
-        "https://tech-example.com/solid-state": (
+    items: list[tuple[str, bytes]] = [
+        # --- BATTERIES ---
+        (
+            "https://tech-example.com/solid-state",
             b"<html><head><title>Solid-State Batteries</title></head>"
             b"<body><h1>Solid-State Batteries: The Future?</h1>"
             b"<p>Solid-state batteries use a solid electrolyte instead of a liquid one. "
@@ -80,9 +203,13 @@ def canned_pages() -> dict[str, bytes]:
             b"<h2>Why they matter</h2>"
             b"<p>They could revolutionize EVs by extending range to 800+ miles and reducing charging time to 10 minutes.</p>"
             b"<h2>Challenges</h2>"
-            b"<p>Manufacturing costs are currently high, and dendrite formation remains a technical hurdle.</p></body></html>"
+            b"<p>Manufacturing costs are currently high, and dendrite formation remains a technical hurdle.</p>"
+            b"<h2>Types of Solid Electrolytes</h2>"
+            b"<ul><li>Oxides: Stable but brittle.</li><li>Sulfides: High conductivity but sensitive to moisture.</li><li>Polymers: Easy to process but lower conductivity.</li></ul>"
+            b"</body></html>"
         ),
-        "https://energy-example.com/li-ion": (
+        (
+            "https://energy-example.com/li-ion",
             b"<html><head><title>Lithium-Ion Batteries</title></head>"
             b"<body><h1>Lithium-Ion Batteries Explained</h1>"
             b"<p>Li-ion batteries use liquid electrolytes to move ions between cathode and anode. "
@@ -90,21 +217,154 @@ def canned_pages() -> dict[str, bytes]:
             b"<h2>Importance</h2>"
             b"<p>They power everything from phones to Teslas. The supply chain is established.</p>"
             b"<h2>Downsides</h2>"
-            b"<p>Thermal runaway risks and lower theoretical energy density limits (approx 250 Wh/kg) compared to solid-state.</p></body></html>"
+            b"<p>Thermal runaway risks and lower theoretical energy density limits (approx 250 Wh/kg) compared to solid-state.</p>"
+            b"<h2>Chemistry Types</h2>"
+            b"<p>NMC (Nickel Manganese Cobalt) offers high density. LFP (Lithium Iron Phosphate) is cheaper and safer but less dense.</p>"
+            b"</body></html>"
         ),
-        "https://safety-example.org/battery-safety": (
-            b"<html><body><h1>Safety Comparison</h1><p>Solid state batteries are safer because they do not use flammable liquid electrolytes.</p></body></html>"
+        (
+            "https://safety-example.org/battery-safety",
+            b"<html><body><h1>Safety Comparison</h1>"
+            b"<p>Solid state batteries are safer because they do not use flammable liquid electrolytes.</p>"
+            b"<h2>Thermal Runaway</h2>"
+            b"<p>Liquid electrolytes can catch fire at 60C. Solid electrolytes are stable up to 200C+.</p>"
+            b"</body></html>"
         ),
-        "https://ev-safety.com/thermal-runaway": (
-            b"<html><body><h1>Thermal Runaway</h1><p>Thermal runaway is a major risk in Li-ion batteries.</p></body></html>"
+        (
+            "https://ev-safety.com/thermal-runaway",
+            b"<html><body><h1>Thermal Runaway</h1>"
+            b"<p>Thermal runaway is a major risk in Li-ion batteries.</p>"
+            b"<p>It occurs when a cell short-circuits and generates heat faster than it can dissipate.</p>"
+            b"<h2>Prevention</h2>"
+            b"<p>BMS (Battery Management Systems) monitor temp. Liquid cooling helps.</p>"
+            b"</body></html>"
         ),
-        "https://market-example.net/battery-cost": (
-            b"<html><body><h1>Battery Costs</h1><p>Li-ion is cheap ($130/kWh). Solid state is expensive.</p></body></html>"
+        (
+            "https://market-example.net/battery-cost",
+            b"<html><body><h1>Battery Costs</h1>"
+            b"<p>Li-ion is cheap ($130/kWh). Solid state is expensive ($800/kWh estimated).</p>"
+            b"<p>Price parity is expected by 2030 if manufacturing scales.</p>"
+            b"</body></html>"
         ),
-        "https://tech-news.com/quantumscape": (
-            b"<html><body><h1>QuantumScape News</h1><p>Working on solving dendrite issues.</p></body></html>"
+        (
+            "https://tech-news.com/quantumscape",
+            b"<html><body><h1>QuantumScape News</h1>"
+            b"<p>Working on solving dendrite issues using a ceramic separator.</p>"
+            b"<p>Stock is volatile. Partners with VW.</p>"
+            b"</body></html>"
         ),
-    }
+        (
+            "https://auto-news.com/toyota-battery",
+            b"<html><body><h1>Toyota's Roadmap</h1><p>Toyota aims for 2027 launch. 1200km range target.</p></body></html>"
+        ),
+        (
+            "https://green-tech.org/recycling",
+            b"<html><body><h1>Battery Recycling</h1><p>Hydrometallurgy vs Pyrometallurgy. 95% recovery rates possible.</p></body></html>"
+        ),
+        (
+            "https://chem-daily.com/sodium-ion",
+            b"<html><body><h1>Sodium Ion</h1><p>No lithium needed. Good for stationary storage. Lower density (160 Wh/kg).</p></body></html>"
+        ),
+
+        # --- AI MODELS ---
+        (
+            "https://ai-insider.com/gpt4-arch",
+            b"<html><body><h1>GPT-4 Architecture</h1><p>Likely MoE with 8 experts. 1.8T params.</p></body></html>"
+        ),
+        (
+            "https://compute-daily.com/training-costs",
+            b"<html><body><h1>Training Costs</h1><p>H100 clusters are expensive. GPT-4 cost >$60M to train.</p></body></html>"
+        ),
+        (
+            "https://art-tech.net/sd-vs-mj",
+            b"<html><body><h1>SD vs Midjourney</h1><p>SDXL is open weights. MJ v6 has better aesthetics.</p></body></html>"
+        ),
+        (
+            "https://philosophy-ai.org/alignment",
+            b"<html><body><h1>AI Alignment</h1><p>RLHF is the standard. Constitutional AI uses AI to critique AI.</p></body></html>"
+        ),
+
+        # --- CLIMATE ---
+        (
+            "https://climate-watch.org/ipcc-2024",
+            b"<html><body><h1>IPCC 2024</h1><p>1.5C target is slipping. Methane reduction is critical.</p></body></html>"
+        ),
+        (
+            "https://engineering-green.com/ccs",
+            b"<html><body><h1>Carbon Capture</h1><p>DAC is energy intensive. Point source is cheaper.</p></body></html>"
+        ),
+        (
+            "https://energy-stats.com/asia-renewables",
+            b"<html><body><h1>Asia Renewables</h1><p>China installed 200GW of solar in 2023.</p></body></html>"
+        ),
+
+        # --- DISTRACTORS ---
+        (
+            "https://pc-gamer.com/best-ssd",
+            b"<html><body><h1>Best SSDs</h1><p>Samsung 990 Pro is top tier. Gen5 drives are hot.</p></body></html>"
+        ),
+        (
+            "https://finance-daily.com/lithium-stocks",
+            b"<html><body><h1>Lithium Stocks</h1><p>Buy low, sell high. Volatile market.</p></body></html>"
+        ),
+        (
+            "https://cooking-blog.com/solid-cake",
+            b"<html><body><h1>Solid Cake Recipe</h1><p>Use more flour. Bake at 350F.</p></body></html>"
+        ),
+
+        # --- DOJ / NEWS ---
+        (
+            "https://justice-example.gov/press/doj-enforcement",
+            b"<html><body><h1>DOJ Enforcement Action</h1><p>DOJ announced an enforcement action. This is an official press release.</p></body></html>",
+        ),
+        (
+            "https://justice-example.gov/news",
+            b"<html><body><h1>DOJ Newsroom</h1><p>Latest DOJ newsroom updates and announcements.</p></body></html>",
+        ),
+
+        # --- WEATHER (Tokyo seasons) ---
+        (
+            "https://weather-example.com/tokyo-spring",
+            b"<html><body><h1>Tokyo Spring Weather</h1><p>Spring is mild. Average highs 15-22C, with moderate rainfall.</p></body></html>",
+        ),
+        (
+            "https://weather-example.com/tokyo-summer",
+            b"<html><body><h1>Tokyo Summer Weather</h1><p>Summer is hot and humid. Average highs 28-33C. Rainy season occurs in early summer.</p></body></html>",
+        ),
+        (
+            "https://weather-example.com/tokyo-autumn",
+            b"<html><body><h1>Tokyo Autumn Weather</h1><p>Autumn is cooler and comfortable. Average highs 18-26C. Rainfall decreases compared to summer.</p></body></html>",
+        ),
+        (
+            "https://weather-example.com/tokyo-winter",
+            b"<html><body><h1>Tokyo Winter Weather</h1><p>Winter is cool and relatively dry. Average highs 8-12C, lows 1-5C.</p></body></html>",
+        ),
+
+        # --- GITHUB ---
+        (
+            "https://github.com/example/deep-research-agent",
+            b"<html><body><h1>deep-research-agent</h1><p>Example repository for a deep research agent.</p></body></html>",
+        ),
+
+        # --- PDF ---
+        (
+            "https://reports-example.com/tesla-annual-report-2023.pdf",
+            b"<html><body><h1>Tesla Annual Report 2023</h1><p>PDF content placeholder: annual report highlights.</p></body></html>",
+        ),
+    ]
+
+    pages: dict[str, bytes] = {}
+    duplicates: list[str] = []
+    for url, content in items:
+        if url in pages:
+            duplicates.append(url)
+            continue
+        pages[url] = content
+
+    if duplicates:
+        raise ValueError(f"Duplicate URLs detected in canned_pages fixture: {sorted(set(duplicates))}")
+
+    return pages
 
 
 @pytest.fixture
@@ -123,13 +383,6 @@ def mock_external_calls(monkeypatch: pytest.MonkeyPatch, canned_serp: list[dict[
             if any(term in text for term in query_terms):
                 results.append(item)
         
-        # Fallback: if no matches found, return nothing (realistic) or generic (helpful)
-        # Let's return generic if empty to avoid "no results" dead ends in simple tests,
-        # but strictly speaking, a real engine might return nothing.
-        if not results:
-             # Return top 2 as fallback to keep agent moving
-             results = canned_serp[:2]
-
         return results[:max_results], 1
 
     async def _mock_download_url_bytes(self: WebSearchService, url: str, use_render: bool = True, timeout: int = 10) -> bytes:
@@ -172,6 +425,12 @@ def mock_external_calls(monkeypatch: pytest.MonkeyPatch, canned_serp: list[dict[
     monkeypatch.setattr(WebSearchService, "download_url_bytes", _mock_download_url_bytes)
     monkeypatch.setattr(FileService, "upload_bytes", _mock_upload_bytes)
     monkeypatch.setattr(DocumentParserService, "parse_files", _mock_parse_files)
+
+
+@pytest.fixture
+def judge_llm() -> GoogleGenAI:
+    model = os.getenv("JUDGE_MODEL", "gemini-2.5-flash-lite").strip() or "gemini-2.5-flash-lite"
+    return GoogleGenAI(model=model, temperature=0)
 
 
 @pytest.fixture
