@@ -30,9 +30,11 @@ Rules:
 - Be strict about intent capture: the planned queries should match the goal and not add unrelated constraints.
 - The agent must use web_search and then generate_evidences from discovered URLs.
 - The agent must stop by calling finalize_research.
+- Execution of Plan: The agent should execute search queries for the key aspects identified in its plan. If it plans multiple distinct queries (e.g. for a comparison) but only executes one and stops, that is a failure.
 - Coverage: If the mock evidence contains enough info to answer the goal, coverage_ok should be true.
   If the goal asks for things not present in the mock world (e.g., Tokyo seasonal weather but no weather pages exist),
-  then coverage_ok should be false but the run can still pass overall if the agent stopped correctly and reported limitations.
+  then coverage_ok should be false.
+- Passing Criteria: The run should PASS if the agent performed reasonable searches for the goal, even if no evidence was found (coverage_ok=false). The agent is not responsible for fabricating data or forcing results where none exist. It is sufficient that it tried to search.
 
 Return a structured JSON matching SearcherJudgeVerdict.
 

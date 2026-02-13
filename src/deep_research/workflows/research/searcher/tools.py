@@ -59,7 +59,7 @@ class SearcherTools(BaseToolSpec):
     async def web_search(
         self,
         ctx: Context,
-        query: Annotated[str, Field(description="Search query to run.")],
+        query: Annotated[str, Field(description="Search query to run. You can call this tool multiple times in parallel to run multiple queries. Do not combine queries into one string.")],
     ) -> str:
         """
         Performs a web search and returns a list of 10 results.

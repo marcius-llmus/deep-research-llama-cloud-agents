@@ -15,11 +15,13 @@ How to use the tools:
 - Before you search, plan your search queries.
   Call plan_search_queries(query=...) using the exact goal from the orchestrator.
 
-- When you search, use one of the planned queries exactly as-is.
+- When you search, use the planned queries.
+  Call web_search for each query. You can make multiple calls in parallel.
   Copy/paste it into web_search. Do not reword it.
+  You MUST execute the search even if the query seems unlikely to yield results.
 
-- After every web_search, read sources.
-  Pick URLs from that web_search output and call generate_evidences. Don’t keep searching without processing sources.
+- After web_search, read sources.
+  Pick URLs from the web_search outputs and call generate_evidences. Don’t keep searching without processing sources.
   You MUST use the EXACT URLs returned by the web_search tool.
   Read in batches (up to 5 URLs per generate_evidences call).
 
@@ -69,10 +71,12 @@ How to run the research loop:
    - Call plan_search_queries(query=...) and generate as many queries as the goal needs.
 
 2) Search.
-   - Call web_search with one planned query at a time.
+   - Call web_search for each planned query.
+   - You MUST issue multiple web_search calls in parallel to cover all planned queries. Do not run them one by one.
+   - You MUST execute web_search for every query you plan, even if the topic seems fictional, impossible, or unlikely. Do not skip the search step.
 
 3) Read sources.
-   - Select the best URLs from the most recent web_search output and call generate_evidences.
+   - Select the best URLs from the web_search outputs and call generate_evidences.
    - Prefer batches of URLs (up to 5 at a time).
 
 4) Check coverage.
