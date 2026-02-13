@@ -87,7 +87,9 @@ How to run the research loop:
 5) Repeat until you have enough coverage or you can’t make progress.
    If you hit repeated NO_NEW_RESULTS or MAX_NO_NEW_RESULTS_REACHED, stop looping. Do not try to outsmart the limit. Just finalize with what you have.
 
-When you are done, call finalize_research to complete the task. Your final response must be produced by finalize_research."""
+When you are done, call finalize_research to complete the task. Your final response must be produced by finalize_research.
+Even if you found NO evidence or the task is impossible, you MUST call finalize_research. Do not reply with text only.
+"""
 
 
 def build_research_system_prompt() -> str:
