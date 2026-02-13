@@ -109,7 +109,7 @@ class SearcherTools(BaseToolSpec):
                 return hoarding_msg
 
             return self._format_no_new_results_message(
-                seen_urls=len(seen_urls),
+                seen_urls=seen_count,
                 failed_urls=len(failed_urls),
             )
 
@@ -127,8 +127,7 @@ class SearcherTools(BaseToolSpec):
             return (
                 "NO_NEW_RESULTS\n"
                 f"However, you have discovered {seen_count} URLs in previous searches but have generated 0 evidence items.\n"
-                "You MUST call generate_evidences on the URLs from your previous web_search outputs before searching again.\n"
-                "The answers you need are likely in those unread sources."
+                "You MUST call generate_evidences on the URLs from your previous web_search outputs before searching again."
             )
         return None
 
@@ -138,10 +137,6 @@ class SearcherTools(BaseToolSpec):
             "NO_NEW_RESULTS\n"
             "All results for this query are already seen/failed.\n"
             f"Seen URLs: {seen_urls} | Failed URLs: {failed_urls}\n\n"
-            "You must choose one:\n"
-            "1) Call generate_evidences using URLs from previous web_search outputs\n"
-            "2) Or refine by calling plan_search_queries(query='<ORIGINAL GOAL>\n\nAlready tried queries:\n- ...\n\nWhat is missing:\n- ...\n\nRefinement keywords/operators: ...') and then web_search using one of the new planned queries verbatim\n"
-            "3) Call finalize_research if evidence is already sufficient"
         )
 
     @staticmethod

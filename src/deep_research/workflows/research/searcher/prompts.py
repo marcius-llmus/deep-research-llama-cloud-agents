@@ -30,6 +30,27 @@ How to use the tools:
 
 - If web_search returns NO_NEW_RESULTS, do not retry the same query.
   Either read more URLs from your previous web_search outputs, or call plan_search_queries again with the original goal plus what you already tried and what is missing.
+
+- If web_search returns MAX_NO_NEW_RESULTS_REACHED, stop searching.
+  This means you are stuck. Do not plan new queries. Do not search again.
+  You must either generate evidence from URLs you already found or finalize the research immediately.
+"""
+
+REFINEMENT_PROTOCOL_SECTION_TMPL = """\
+Refinement Protocol (When NO_NEW_RESULTS):
+
+If web_search returns NO_NEW_RESULTS, you must NOT retry the same query.
+Instead, you must refine your plan using this exact format in `plan_search_queries`:
+
+<ORIGINAL GOAL>
+
+Already tried queries:
+- ...
+
+What is missing:
+- ...
+
+Refinement keywords/operators: ...
 """
 
 STATE_SECTION_TMPL = """\
@@ -60,7 +81,7 @@ How to run the research loop:
    Then run web_search using one of the new planned queries exactly as-is.
 
 5) Repeat until you have enough coverage or you can’t make progress.
-   If you hit repeated NO_NEW_RESULTS, stop looping on web_search. Either generate evidence from known URLs or finalize with what you have.
+   If you hit repeated NO_NEW_RESULTS or MAX_NO_NEW_RESULTS_REACHED, stop looping. Do not try to outsmart the limit. Just finalize with what you have.
 
 When you are done, call finalize_research to complete the task. Your final response must be produced by finalize_research."""
 
@@ -82,6 +103,7 @@ def build_research_system_prompt() -> str:
         SYSTEM_HEADER,
         constraints_section,
         guardrails_section,
+        REFINEMENT_PROTOCOL_SECTION_TMPL,
         state_section,
         WORKFLOW_SECTION_TMPL,
     ]
