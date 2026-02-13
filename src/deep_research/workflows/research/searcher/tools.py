@@ -17,11 +17,9 @@ logger = logging.getLogger(__name__)
 
 class SearcherTools(BaseToolSpec):
     spec_functions = [
-        "decompose_query",
+        "plan_search_queries",
         "web_search",
         "generate_evidences",
-        "verify_research_sufficiency",
-        "follow_up_query_generator",
     ]
 
     def __init__(
@@ -37,17 +35,22 @@ class SearcherTools(BaseToolSpec):
         self.query_service = query_service
         self.evidence_service = evidence_service
 
-
-    async def decompose_query(
+    async def plan_search_queries(
         self,
-        query: Annotated[str, Field(description="User query to decompose into web search queries.")],
+        query: Annotated[
+            str,
+            Field(...,
+                description=(
+                    "The exact research goal from the orchestrator/user. "
+                    "The tool will generate one or more search-engine-ready queries derived from this input."
+                )
+            ),
+        ],
     ) -> str:
-        """
-        Decomposes a research topic into one or more focused web search queries.
-        Use this at the beginning of your research when the prompt includes multiple asks.
-        """
+
         decomposed = await self.query_service.decompose_query(query=query)
-        return decomposed.formatted or "Could not generate queries"
+        queries = [q for q in decomposed.queries if q.strip()]
+        return "\n".join(queries)
 
     async def web_search(
         self,
@@ -100,7 +103,7 @@ class SearcherTools(BaseToolSpec):
             "All results for this query are already seen/failed.\n"
             f"Seen URLs: {seen_urls} | Failed URLs: {failed_urls}\n\n"
             "You must choose one:\n"
-            "1) call follow_up_query_generator(original_query=...) to generate a new angle, then web_search using one of those queries verbatim\n"
+            "1) call plan_search_queries(query='<original goal with refined keywords targeting the missing aspect>') to generate new angles, then web_search using one of those queries verbatim\n"
             "2) call finalize_research if evidence is already sufficient"
         )
 
@@ -176,56 +179,6 @@ class SearcherTools(BaseToolSpec):
             )
         return msg
 
-    async def verify_research_sufficiency(
-        self,
-        ctx: Context,
-        query: Annotated[str, Field(description="The original user query to check against.")],
-    ) -> str:
-        """
-        Checks if the gathered evidence is sufficient to answer the user's query.
-        Returns an analysis of what is covered and what is missing.
-        """
-        state = await ResearchStateAccessor.get(ctx)
-        evidence_summaries = [
-            f"Source: {item.url}\nSummary: {item.summary}"
-            for item in state.research_turn.evidence.items
-        ]
-
-        evidence_text = "\n\n".join(evidence_summaries).strip()
-        if not evidence_text:
-            return "No evidence gathered yet. Use web_search, then generate_evidences to gather evidence before verifying sufficiency."
-
-        return await self.query_service.verify_sufficiency(
-            query=query,
-            evidence_summaries=evidence_text
-        )
-
-    async def follow_up_query_generator(
-        self,
-        ctx: Context,
-        original_query: Annotated[str, Field(description="Original user query.")],
-    ) -> str:
-        """
-        Based on the insights you've already collected, this tool generates new,
-        specific follow-up questions to help you dig deeper into the research topic.
-        """
-        state = await ResearchStateAccessor.get(ctx)
-        pending = state.research_turn.evidence
-
-        insights: list[str] = []
-        for item in pending.items:
-            insights.append(item.summary)
-
-        queries = await self.query_service.generate_follow_up_queries(
-            insights=insights,
-            original_query=original_query,
-        )
-
-        async with ResearchStateAccessor.edit(ctx) as state:
-            state.research_turn.follow_up_queries = queries
-
-        return "\n".join(f"- {q}" for q in queries)
-
     # in order to return direct, it doesn't go in spec_functions
     @staticmethod
     async def finalize_research(ctx: Context) -> str:
@@ -235,7 +188,6 @@ class SearcherTools(BaseToolSpec):
         total_items = len(items)
         seen_urls = len(state.research_turn.seen_urls)
         failed_urls = len(state.research_turn.failed_urls)
-        follow_up_queries = len(state.research_turn.follow_up_queries)
 
         image_assets = 0
         other_assets = 0
@@ -251,8 +203,7 @@ class SearcherTools(BaseToolSpec):
             "Evidence\n"
             f"- Total items: {total_items}\n"
             f"- Seen URLs: {seen_urls}\n"
-            f"- Failed URLs: {failed_urls}\n"
-            f"- Follow-up queries: {follow_up_queries}\n\n"
+            f"- Failed URLs: {failed_urls}\n\n"
             "Assets\n"
             f"- Images selected: {image_assets}\n"
             f"- Other assets selected: {other_assets}\n"
