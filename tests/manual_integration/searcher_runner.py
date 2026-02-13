@@ -39,7 +39,7 @@ async def _reset_searcher_state(ctx: Context) -> None:
         state.orchestrator.research_plan = ""
         state.research_turn.clear()
         state.research_artifact.content = ""
-        state.research_artifact.draft_content = ""
+        state.research_artifact.turn_draft = None
         state.research_artifact.status = ResearchArtifactStatus.RUNNING
 
 

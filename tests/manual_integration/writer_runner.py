@@ -207,7 +207,7 @@ async def main() -> None:
         if user_msg == "/reset":
             async with ctx.store.edit_state() as state:
                 state.research_artifact.content = ""
-                state.research_artifact.draft_content = ""
+                state.research_artifact.turn_draft = None
                 state.research_artifact.status = ResearchArtifactStatus.RUNNING
             print("Reset report state.")
             continue

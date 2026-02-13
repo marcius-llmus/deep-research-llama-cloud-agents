@@ -16,7 +16,7 @@ def _print_snapshot(state: DeepResearchState | None) -> None:
         return
 
     content = state.research_artifact.content
-    draft = state.research_artifact.draft_content
+    draft = state.research_artifact.turn_draft
     items = state.research_turn.evidence.items
     plan = state.orchestrator.research_plan
 
