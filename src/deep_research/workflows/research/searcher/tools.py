@@ -101,6 +101,13 @@ class SearcherTools(BaseToolSpec):
         if not new_results:
             async with ResearchStateAccessor.edit(ctx) as edit_state:
                 edit_state.research_turn.no_new_results_count += 1
+
+            evidence_count = len(state.research_turn.evidence.items)
+            seen_count = len(state.research_turn.seen_urls)
+
+            if hoarding_msg := self._check_hoarding_behavior(seen_count, evidence_count):
+                return hoarding_msg
+
             return self._format_no_new_results_message(
                 seen_urls=len(seen_urls),
                 failed_urls=len(failed_urls),
@@ -113,6 +120,17 @@ class SearcherTools(BaseToolSpec):
             results=new_results,
             ignored_count=ignored_count,
         )
+
+    @staticmethod
+    def _check_hoarding_behavior(seen_count: int, evidence_count: int) -> str | None:
+        if seen_count > 0 and evidence_count == 0:
+            return (
+                "NO_NEW_RESULTS\n"
+                f"However, you have discovered {seen_count} URLs in previous searches but have generated 0 evidence items.\n"
+                "You MUST call generate_evidences on the URLs from your previous web_search outputs before searching again.\n"
+                "The answers you need are likely in those unread sources."
+            )
+        return None
 
     @staticmethod
     def _format_no_new_results_message(*, seen_urls: int, failed_urls: int) -> str:
@@ -175,7 +193,8 @@ class SearcherTools(BaseToolSpec):
             state.research_turn.add_failed_urls(list(failures))
             state.research_turn.add_seen_urls([i.url for i in new_items] + list(failures))
             state.research_turn.add_evidence_items(new_items)
-            state.research_turn.no_new_results_count = 0
+            if new_items:
+                state.research_turn.no_new_results_count = 0
 
         all_summaries = []
         for item in new_items:

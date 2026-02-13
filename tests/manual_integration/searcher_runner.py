@@ -46,12 +46,10 @@ async def _reset_searcher_state(ctx: Context) -> None:
 def _print_state_snapshot(state: DeepResearchState) -> None:
     seen_urls = state.research_turn.seen_urls
     items = state.research_turn.evidence.items
-    follow_ups = state.research_turn.follow_up_queries
 
     print("\n--- State snapshot ---")
     print(f"seen_urls: {len(seen_urls)}")
     print(f"pending_evidence.items: {len(items)}")
-    print(f"follow_up_queries: {len(follow_ups)}")
 
 
 async def main() -> None:

@@ -8,10 +8,7 @@ from deep_research.workflows.research.writer.agent import workflow as writer_age
 async def call_research_agent(ctx: Context, prompt: str) -> str:
     print(f"Orchestrator -> SearcherAgent: {prompt}")
 
-    await searcher_agent.run(
-        user_msg=str(prompt),
-        ctx=ctx,
-    )
+    await searcher_agent.run(user_msg=prompt, ctx=ctx)
 
     state = await ResearchStateAccessor.get(ctx)
     return state.research_turn.evidence.get_summary()
