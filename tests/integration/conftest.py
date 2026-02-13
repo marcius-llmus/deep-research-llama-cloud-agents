@@ -33,7 +33,12 @@ def use_real_llm() -> bool:
 
 
 @pytest.fixture
-def canned_serp() -> list[dict[str, Any]]:
+def world_name(request: pytest.FixtureRequest) -> str:
+    return getattr(request, "param", "global")
+
+
+@pytest.fixture
+def canned_serp_all() -> list[dict[str, Any]]:
     return [
         # --- BATTERIES (Solid State vs Li-ion) ---
         # High Relevance
@@ -147,6 +152,16 @@ def canned_serp() -> list[dict[str, Any]]:
             "desc": "Department of Justice announces an enforcement action. Official press release.",
         },
         {
+            "title": "DOJ Press Release (Feb 2026): Antitrust Division Settlement",
+            "url": "https://justice-example.gov/press/feb-2026-antitrust-settlement",
+            "desc": "Feb 12, 2026: DOJ Antitrust Division announces a settlement in a major case. Official press release.",
+        },
+        {
+            "title": "DOJ Press Release (Feb 2026): Civil Rights Investigation Update",
+            "url": "https://justice-example.gov/press/feb-2026-civil-rights-update",
+            "desc": "Feb 20, 2026: DOJ Civil Rights Division provides an update on an investigation. Official press release.",
+        },
+        {
             "title": "DOJ Newsroom Updates",
             "url": "https://justice-example.gov/news",
             "desc": "Latest DOJ newsroom updates and announcements.",
@@ -180,6 +195,16 @@ def canned_serp() -> list[dict[str, Any]]:
             "url": "https://github.com/example/deep-research-agent",
             "desc": "Repository containing a deep research agent example.",
         },
+        {
+            "title": "open-deep-research repository",
+            "url": "https://github.com/example/open-deep-research",
+            "desc": "Open-source implementation inspired by 'deep research' style agents.",
+        },
+        {
+            "title": "gpt-researcher repository",
+            "url": "https://github.com/example/gpt-researcher",
+            "desc": "Autonomous research agent that iterates web search and builds cited reports.",
+        },
 
         # --- FILETYPE:PDF / TESLA REPORT ---
         {
@@ -187,11 +212,58 @@ def canned_serp() -> list[dict[str, Any]]:
             "url": "https://reports-example.com/tesla-annual-report-2023.pdf",
             "desc": "Annual report for Tesla (2023). PDF document.",
         },
+        {
+            "title": "Tesla Form 10-K 2023 (PDF) - SEC Archive",
+            "url": "https://sec-example.gov/tesla-10k-2023.pdf",
+            "desc": "SEC-hosted PDF of Tesla 2023 Form 10-K annual report filing.",
+        },
     ]
 
 
 @pytest.fixture
-def canned_pages() -> dict[str, bytes]:
+def canned_serp(world_name: str, canned_serp_all: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if world_name == "global":
+        return canned_serp_all
+
+    world_domains: dict[str, set[str]] = {
+        "doj": {"justice-example.gov"},
+        "tokyo_weather": {"weather-example.com"},
+        "batteries": {
+            "tech-example.com",
+            "energy-example.com",
+            "safety-example.org",
+            "ev-safety.com",
+            "market-example.net",
+            "tech-news.com",
+            "auto-news.com",
+            "green-tech.org",
+            "chem-daily.com",
+        },
+        "github": {"github.com"},
+        "pdf": {"reports-example.com", "sec-example.gov"},
+        "sparse": set(),
+    }
+
+    allowed = world_domains.get(world_name)
+    if allowed is None:
+        raise ValueError(f"Unknown world_name={world_name!r}")
+
+    if not allowed:
+        return []
+
+    out: list[dict[str, Any]] = []
+    for item in canned_serp_all:
+        url = (item.get("url") or "").strip()
+        if not url:
+            continue
+        domain = url.split("/", 3)[2] if url.startswith("http") and "/" in url else ""
+        if domain in allowed:
+            out.append(item)
+    return out
+
+
+@pytest.fixture
+def canned_pages_all() -> dict[str, bytes]:
     items: list[tuple[str, bytes]] = [
         # --- BATTERIES ---
         (
@@ -318,26 +390,63 @@ def canned_pages() -> dict[str, bytes]:
             b"<html><body><h1>DOJ Enforcement Action</h1><p>DOJ announced an enforcement action. This is an official press release.</p></body></html>",
         ),
         (
+            "https://justice-example.gov/press/feb-2026-antitrust-settlement",
+            b"<html><body><h1>Feb 12, 2026 - DOJ Antitrust Division Settlement</h1>"
+            b"<p>On Feb 12, 2026, the DOJ Antitrust Division announced a settlement in a major case.</p>"
+            b"<p>Key points: alleged anti-competitive conduct; settlement terms include compliance commitments and penalties.</p>"
+            b"</body></html>",
+        ),
+        (
+            "https://justice-example.gov/press/feb-2026-civil-rights-update",
+            b"<html><body><h1>Feb 20, 2026 - Civil Rights Investigation Update</h1>"
+            b"<p>On Feb 20, 2026, the DOJ Civil Rights Division provided an update on an investigation.</p>"
+            b"<p>Key points: scope of investigation, next steps, and public guidance.</p>"
+            b"</body></html>",
+        ),
+        (
             "https://justice-example.gov/news",
-            b"<html><body><h1>DOJ Newsroom</h1><p>Latest DOJ newsroom updates and announcements.</p></body></html>",
+            b"<html><body><h1>DOJ Newsroom</h1>"
+            b"<p>Latest DOJ newsroom updates and announcements.</p>"
+            b"<ul>"
+            b"<li>Feb 20, 2026: Civil Rights Investigation Update (press release)</li>"
+            b"<li>Feb 12, 2026: Antitrust Division Settlement (press release)</li>"
+            b"<li>Jan 30, 2026: Example Enforcement Action (press release)</li>"
+            b"</ul>"
+            b"</body></html>",
         ),
 
         # --- WEATHER (Tokyo seasons) ---
         (
             "https://weather-example.com/tokyo-spring",
-            b"<html><body><h1>Tokyo Spring Weather</h1><p>Spring is mild. Average highs 15-22C, with moderate rainfall.</p></body></html>",
+            b"<html><body><h1>Tokyo Spring Weather</h1>"
+            b"<p>Spring is mild. Average highs 15-22C, lows 7-14C.</p>"
+            b"<p>Typical precipitation: 110-140 mm/month. Humidity is moderate (55-65%).</p>"
+            b"<p>Seasonal note: cherry blossom season typically peaks in late March to early April.</p>"
+            b"</body></html>",
         ),
         (
             "https://weather-example.com/tokyo-summer",
-            b"<html><body><h1>Tokyo Summer Weather</h1><p>Summer is hot and humid. Average highs 28-33C. Rainy season occurs in early summer.</p></body></html>",
+            b"<html><body><h1>Tokyo Summer Weather</h1>"
+            b"<p>Summer is hot and humid. Average highs 28-33C, lows 22-26C.</p>"
+            b"<p>Typical precipitation: 150-210 mm/month. Humidity is high (70-85%).</p>"
+            b"<p>Seasonal note: rainy season typically occurs in early summer; typhoons can occur later in summer.</p>"
+            b"</body></html>",
         ),
         (
             "https://weather-example.com/tokyo-autumn",
-            b"<html><body><h1>Tokyo Autumn Weather</h1><p>Autumn is cooler and comfortable. Average highs 18-26C. Rainfall decreases compared to summer.</p></body></html>",
+            b"<html><body><h1>Tokyo Autumn Weather</h1>"
+            b"<p>Autumn is cooler and comfortable. Average highs 18-26C, lows 10-18C.</p>"
+            b"<p>Typical precipitation: 120-170 mm/month, generally lower than summer. Humidity 55-70%.</p>"
+            b"<p>Seasonal note: autumn foliage typically peaks in November.</p>"
+            b"</body></html>",
         ),
         (
             "https://weather-example.com/tokyo-winter",
-            b"<html><body><h1>Tokyo Winter Weather</h1><p>Winter is cool and relatively dry. Average highs 8-12C, lows 1-5C.</p></body></html>",
+            b"<html><body><h1>Tokyo Winter Weather</h1>"
+            b"<p>Winter is cool and relatively dry. Average highs 8-12C, lows 1-5C.</p>"
+            b"<p>Typical precipitation: 40-70 mm/month. Humidity 45-60%.</p>"
+            b"<p>Snow is infrequent but possible.</p>"
+            b"</body></html>",
         ),
 
         # --- GITHUB ---
@@ -345,11 +454,23 @@ def canned_pages() -> dict[str, bytes]:
             "https://github.com/example/deep-research-agent",
             b"<html><body><h1>deep-research-agent</h1><p>Example repository for a deep research agent.</p></body></html>",
         ),
+        (
+            "https://github.com/example/open-deep-research",
+            b"<html><body><h1>open-deep-research</h1><p>Open-source implementation inspired by deep research-style workflows.</p></body></html>",
+        ),
+        (
+            "https://github.com/example/gpt-researcher",
+            b"<html><body><h1>gpt-researcher</h1><p>Autonomous research agent that iterates web search and produces cited reports.</p></body></html>",
+        ),
 
         # --- PDF ---
         (
             "https://reports-example.com/tesla-annual-report-2023.pdf",
             b"<html><body><h1>Tesla Annual Report 2023</h1><p>PDF content placeholder: annual report highlights.</p></body></html>",
+        ),
+        (
+            "https://sec-example.gov/tesla-10k-2023.pdf",
+            b"<html><body><h1>Tesla 10-K 2023 (SEC)</h1><p>SEC archive placeholder: Tesla 2023 Form 10-K filing.</p></body></html>",
         ),
     ]
 
@@ -368,22 +489,45 @@ def canned_pages() -> dict[str, bytes]:
 
 
 @pytest.fixture
+def canned_pages(world_name: str, canned_pages_all: dict[str, bytes], canned_serp: list[dict[str, Any]]) -> dict[str, bytes]:
+    if world_name == "global":
+        return canned_pages_all
+
+    allowed_urls = {str(i.get("url")).strip() for i in canned_serp if (i.get("url") or "").strip()}
+    if not allowed_urls:
+        return {}
+
+    pages: dict[str, bytes] = {}
+    for url in allowed_urls:
+        if url in canned_pages_all:
+            pages[url] = canned_pages_all[url]
+    return pages
+
+
+@pytest.fixture
 def mock_external_calls(monkeypatch: pytest.MonkeyPatch, canned_serp: list[dict[str, Any]], canned_pages: dict[str, bytes]):
     async def _mock_search_google(self: WebSearchService, query: str, max_results: int = 10):
-        # Simple keyword matching to simulate a real search engine
         query_terms = [t.lower() for t in query.split() if len(t) > 3]
-        results = []
-        
-        # If no specific terms, return a mix
+
         if not query_terms:
             return canned_serp[:max_results], 1
 
+        scored: list[tuple[int, dict[str, Any]]] = []
         for item in canned_serp:
-            text = (item["title"] + " " + item["desc"]).lower()
-            if any(term in text for term in query_terms):
-                results.append(item)
-        
-        return results[:max_results], 1
+            text = (str(item.get("title") or "") + " " + str(item.get("desc") or "")).lower()
+            score = sum(1 for term in query_terms if term in text)
+            if score:
+                scored.append((score, item))
+
+        scored.sort(key=lambda x: x[0], reverse=True)
+
+        # Reduce cross-topic false positives on longer queries.
+        # - short queries: allow single-term match
+        # - longer queries: require >=2 terms matched
+        min_score = 1 if len(query_terms) <= 3 else 2
+        filtered = [item for score, item in scored if score >= min_score]
+
+        return filtered[:max_results], 1
 
     async def _mock_download_url_bytes(self: WebSearchService, url: str, use_render: bool = True, timeout: int = 10) -> bytes:
         return canned_pages.get(url, b"")

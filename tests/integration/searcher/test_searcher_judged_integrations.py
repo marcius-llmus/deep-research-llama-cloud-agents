@@ -49,38 +49,46 @@ EVIDENCE SUMMARY:
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "goal,trace_name",
+    "goal,trace_name,world_name",
     [
         (
             "latest doj news",
             "judge_latest_doj",
+            "doj",
         ),
         (
             "site:github.com deep-research-agent",
             "judge_site_operator",
+            "github",
         ),
         (
             "Compare the weather in Tokyo during Spring, Summer, Autumn, and Winter.",
             "judge_tokyo_weather",
+            "tokyo_weather",
         ),
         (
             "filetype:pdf annual report 2023 tesla",
             "judge_filetype_pdf",
+            "pdf",
         ),
         (
             "Compare Solid State Batteries and Lithium-Ion Batteries, focusing on energy density and safety. Be thorough.",
             "judge_batteries_rich",
+            "batteries",
         ),
         (
             "Detailed biological analysis of unicorns living on Mars surface in 2025.",
             "judge_sparse_failure",
+            "sparse",
         ),
     ],
+    indirect=["world_name"],
 )
-async def test_searcher_run_is_judged_end_to_end(run_searcher, judge_llm, goal: str, trace_name: str):
+async def test_searcher_run_is_judged_end_to_end(run_searcher, judge_llm, goal: str, trace_name: str, world_name: str):
     print("\n" + "=" * 120)
     print(f"Judged integration case: {trace_name}")
     print(f"Goal: {goal}")
+    print(f"World: {world_name}")
     print("=" * 120 + "\n")
 
     state, events, _result, trace_path = await run_searcher(
