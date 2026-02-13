@@ -25,10 +25,6 @@ async def test_searcher_tool_order_contract(run_searcher):
     tool_names = [e.tool_name for e in tool_calls]
 
     if tool_names:
-        assert tool_names[0] == "decompose_query"
-
-    if "verify_research_sufficiency" in tool_names:
-        assert "generate_evidences" in tool_names
-        assert tool_names.index("generate_evidences") < tool_names.index("verify_research_sufficiency")
+        assert tool_names[0] == "plan_search_queries"
 
     assert state.research_turn.evidence.items

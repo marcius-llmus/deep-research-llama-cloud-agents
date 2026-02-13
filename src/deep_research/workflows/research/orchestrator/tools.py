@@ -9,7 +9,7 @@ async def call_research_agent(ctx: Context, prompt: str) -> str:
     print(f"Orchestrator -> SearcherAgent: {prompt}")
 
     await searcher_agent.run(
-        user_msg=f"Write some notes about the following: {prompt}",
+        user_msg=str(prompt),
         ctx=ctx,
     )
 

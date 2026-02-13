@@ -23,12 +23,14 @@ class ResearchTurnState(BaseModel):
     failed_urls: list[str] = Field(default_factory=list)
     evidence: EvidenceBundle = Field(default_factory=EvidenceBundle)
     follow_up_queries: list[str] = Field(default_factory=list)
+    no_new_results_count: int = 0
 
     def clear(self) -> None:
         self.seen_urls = []
         self.failed_urls = []
         self.evidence = EvidenceBundle()
         self.follow_up_queries = []
+        self.no_new_results_count = 0
 
     def add_seen_urls(self, urls: list[str]) -> None:
         merged = set(self.seen_urls)

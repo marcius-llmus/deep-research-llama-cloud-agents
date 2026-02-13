@@ -42,7 +42,8 @@ class SearcherTools(BaseToolSpec):
             Field(...,
                 description=(
                     "The exact research goal from the orchestrator/user. "
-                    "The tool will generate one or more search-engine-ready queries derived from this input."
+                    "The tool will generate one or more search-engine-ready queries derived from this input. "
+                    "When refining, keep the original goal present and append what you already tried and what is missing."
                 )
             ),
         ],
@@ -63,12 +64,24 @@ class SearcherTools(BaseToolSpec):
         state = await ResearchStateAccessor.get(ctx)
         seen_urls = set(map(str, state.research_turn.seen_urls))
         failed_urls = set(map(str, state.research_turn.failed_urls))
+        no_new_results_count = int(getattr(state.research_turn, "no_new_results_count", 0))
+
+        if no_new_results_count >= 3:
+            return (
+                "MAX_NO_NEW_RESULTS_REACHED\n"
+                "web_search has returned NO_NEW_RESULTS too many times in this turn.\n\n"
+                "You must choose one:\n"
+                "1) Call generate_evidences using URLs from previous web_search outputs\n"
+                "2) Call finalize_research if evidence is already sufficient\n"
+            )
 
         search_data, _requests_made = await self.web_search_service.search_google(
             query=query,
             max_results=self.config.searcher.max_results_per_query,
         )
         if not search_data:
+            async with ResearchStateAccessor.edit(ctx) as edit_state:
+                edit_state.research_turn.no_new_results_count += 1
             return "No results found for this query."
 
         new_results: list[dict] = []
@@ -86,10 +99,15 @@ class SearcherTools(BaseToolSpec):
                 state.research_turn.add_seen_urls([r["url"] for r in new_results])
 
         if not new_results:
+            async with ResearchStateAccessor.edit(ctx) as edit_state:
+                edit_state.research_turn.no_new_results_count += 1
             return self._format_no_new_results_message(
                 seen_urls=len(seen_urls),
                 failed_urls=len(failed_urls),
             )
+
+        async with ResearchStateAccessor.edit(ctx) as edit_state:
+            edit_state.research_turn.no_new_results_count = 0
 
         return self._format_search_results(
             results=new_results,
@@ -103,8 +121,9 @@ class SearcherTools(BaseToolSpec):
             "All results for this query are already seen/failed.\n"
             f"Seen URLs: {seen_urls} | Failed URLs: {failed_urls}\n\n"
             "You must choose one:\n"
-            "1) call plan_search_queries(query='<original goal with refined keywords targeting the missing aspect>') to generate new angles, then web_search using one of those queries verbatim\n"
-            "2) call finalize_research if evidence is already sufficient"
+            "1) Call generate_evidences using URLs from previous web_search outputs\n"
+            "2) Or refine by calling plan_search_queries(query='<ORIGINAL GOAL>\n\nAlready tried queries:\n- ...\n\nWhat is missing:\n- ...\n\nRefinement keywords/operators: ...') and then web_search using one of the new planned queries verbatim\n"
+            "3) Call finalize_research if evidence is already sufficient"
         )
 
     @staticmethod
@@ -156,6 +175,7 @@ class SearcherTools(BaseToolSpec):
             state.research_turn.add_failed_urls(list(failures))
             state.research_turn.add_seen_urls([i.url for i in new_items] + list(failures))
             state.research_turn.add_evidence_items(new_items)
+            state.research_turn.no_new_results_count = 0
 
         all_summaries = []
         for item in new_items:
