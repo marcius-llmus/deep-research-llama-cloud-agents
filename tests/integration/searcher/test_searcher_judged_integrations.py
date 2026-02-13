@@ -57,12 +57,12 @@ EVIDENCE SUMMARY:
             "doj",
         ),
         (
-            "site:github.com deep-research-agent",
+            "search deep-research-agent, but only from github",
             "judge_site_operator",
             "github",
         ),
         (
-            "Compare the weather in Tokyo during Spring, Summer, Autumn, and Winter.",
+            "Compare the weather in Tokyo during all stations of the year",
             "judge_tokyo_weather",
             "tokyo_weather",
         ),
