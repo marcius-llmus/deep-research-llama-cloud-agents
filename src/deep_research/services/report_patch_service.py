@@ -68,6 +68,25 @@ class ReportPatchService:
 
         return total_additions, total_deletions
 
+    @staticmethod
+    def count_line_changes(*, old: str, new: str) -> tuple[int, int]:
+        old_lines = (old or "").splitlines()
+        new_lines = (new or "").splitlines()
+
+        old_set: dict[str, int] = {}
+        for line in old_lines:
+            old_set[line] = old_set.get(line, 0) + 1
+
+        additions = 0
+        for line in new_lines:
+            if old_set.get(line, 0) > 0:
+                old_set[line] -= 1
+                continue
+            additions += 1
+
+        deletions = sum(max(0, v) for v in old_set.values())
+        return additions, deletions
+
     async def apply_patch(
         self, *, original_text: str, patch_text: str
     ) -> tuple[str, int, int]:

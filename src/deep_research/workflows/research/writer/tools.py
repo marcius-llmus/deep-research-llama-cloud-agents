@@ -1,5 +1,3 @@
-from typing import Annotated, Literal
-
 from llama_index.core.tools.tool_spec.base import BaseToolSpec
 from llama_index.core.tools import ToolMetadata
 from workflows import Context
@@ -7,19 +5,13 @@ from pydantic import BaseModel, Field, create_model
 
 from deep_research.config import ResearchConfig
 from deep_research.services.report_patch_service import ReportPatchService
-from deep_research.workflows.research.state import DeepResearchState, ResearchStateAccessor
+from deep_research.workflows.research.state import ResearchStateAccessor
 
 from deep_research.services.patch_prompts import (
     get_patch_format_instructions,
     get_patch_format_tool_instructions,
 )
-
-
-class ReviewPatchResponse(BaseModel):
-    decision: Literal["approved", "rejected"] = Field(description="approved or rejected")
-    message: str
-    added_lines: int = 0
-    removed_lines: int = 0
+from deep_research.workflows.research.writer.models import ReviewPatchResponse
 
 
 def _build_apply_patch_metadata() -> ToolMetadata:
@@ -36,38 +28,6 @@ def _build_apply_patch_metadata() -> ToolMetadata:
         description=tool_description,
         fn_schema=schema,
     )
-
-
-def _build_review_patch_metadata() -> ToolMetadata:
-    schema: type[BaseModel] = create_model("ReviewPatchToolSchema")
-
-    return ToolMetadata(
-        name="review_patch",
-        description=(
-            "Reviews the pending draft report. If structurally valid, commits the draft to the main report and clears the draft. "
-            "Returns a structured JSON result with approval/rejection and line counts."
-        ),
-        fn_schema=schema,
-    )
-
-
-def _count_line_changes(*, old: str, new: str) -> tuple[int, int]:
-    old_lines = old.splitlines()
-    new_lines = new.splitlines()
-
-    old_set = {}
-    for line in old_lines:
-        old_set[line] = old_set.get(line, 0) + 1
-
-    additions = 0
-    for line in new_lines:
-        if old_set.get(line, 0) > 0:
-            old_set[line] -= 1
-            continue
-        additions += 1
-
-    deletions = sum(max(0, v) for v in old_set.values())
-    return additions, deletions
 
 
 class WriterTools(BaseToolSpec):
@@ -91,54 +51,84 @@ class WriterTools(BaseToolSpec):
         diff: str,
     ) -> str:
         state = await ResearchStateAccessor.get(ctx)
-        current = state.research_artifact.content
+        
+        current_draft = state.research_artifact.turn_draft
+        if current_draft is None:
+            current_draft = state.research_artifact.content
 
         new_content, added, removed = await self.report_patch_service.apply_patch(
-            original_text=current,
+            original_text=current_draft,
             patch_text=diff,
         )
 
         async with ResearchStateAccessor.edit(ctx) as edit_state:
-            edit_state.research_artifact.draft_content = new_content
+            if edit_state.research_artifact.turn_draft is None:
+                edit_state.research_artifact.turn_draft = current_draft
+            edit_state.research_artifact.pending_patch_content = new_content
 
         return (
-            f"Report patched. Added {added} lines, removed {removed} lines. Waiting for review."
+            f"Patch applied to buffer. Added {added} lines, removed {removed} lines. "
+            "Please call review_patch to commit this change to the draft."
         )
 
     async def review_patch(self, ctx: Context) -> str: # noqa
         async with ResearchStateAccessor.edit(ctx) as state:
-            draft = state.research_artifact.draft_content
-            current = state.research_artifact.content
+            pending = state.research_artifact.pending_patch_content
+            current_draft = state.research_artifact.turn_draft
 
-            if not draft.strip():
+            if pending is None:
                 return ReviewPatchResponse(
                     decision="rejected",
-                    message="Draft content is empty. Please apply a patch first.",
+                    message="No pending patch to review. Please apply a patch first.",
                 ).model_dump_json()
 
-            added, removed = _count_line_changes(old=current, new=draft)
 
-            state.research_artifact.content = draft
-            state.research_artifact.draft_content = ""
-            state.research_turn.clear()
+            # todo: maybe we can improve it later
+            if current_draft and len(current_draft) > 100 and len(pending) < len(current_draft) * 0.5:
+                state.research_artifact.pending_patch_content = None
+                return ReviewPatchResponse(
+                    decision="rejected",
+                    message="Patch rejected: Deletes more than 50% of the report content. Please try again.",
+                ).model_dump_json()
+
+            added, removed = self.report_patch_service.count_line_changes(
+                old=current_draft, new=pending
+            )
+
+            state.research_artifact.turn_draft = pending
+            state.research_artifact.pending_patch_content = None
 
         return ReviewPatchResponse(
             decision="approved",
-            message="Patch reviewed and committed. Report updated. New research turn started.",
+            message="Patch reviewed and committed to draft. You may continue applying patches or call finish_writing.",
             added_lines=added,
             removed_lines=removed,
         ).model_dump_json()
 
+    async def finish_writing(self, ctx: Context) -> str: # noqa
+        """
+        Finalizes the writing session. Commits the current draft to the main report and stops the writer agent.
+        """
+        async with ResearchStateAccessor.edit(ctx) as state:
+            draft = state.research_artifact.turn_draft
+            
+            if draft is None:
+                return "No changes were made in this session."
+
+            state.research_artifact.content = draft
+            state.research_artifact.turn_draft = None
+            state.research_artifact.pending_patch_content = None
+            
+            state.research_turn.clear()
+
+        return "Writing session finished. Report updated."
+
     def to_tool_list(self, *args, **kwargs):
         apply_patch_metadata = _build_apply_patch_metadata()
-        review_patch_metadata = _build_review_patch_metadata()
         return super().to_tool_list(
             *args,
             **kwargs,
             func_to_metadata_mapping={
                 "apply_patch": apply_patch_metadata,
-                "review_patch": review_patch_metadata,
             },
         )
-
-    
