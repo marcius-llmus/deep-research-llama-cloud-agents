@@ -6,8 +6,18 @@ OPTIMIZE_QUERY_INSTRUCTION = """
 4. Do NOT answer the request. Do NOT summarize. Do NOT add commentary.
 
 **Decomposition rules:**
-6. You must take user query and decompose as needed for a search engine. You basically convert user intention in objective queries.
-7. Keep each query concise and specific. Avoid redundancy.
+6. Analyze the user intent carefully:
+   - If the request is simple or specific (e.g., "latest doj news", "site:github.com deep-research"), generate a SINGLE targeted query.
+   - If the request is complex, comparative, or multi-part, decompose it into separate queries for each distinct aspect that must be answered.
+   - When the user intent implies a set of sub-parts even if not listed explicitly, infer the natural breakdown and create one query per part only when it is necessary for coverage.
+     Examples:
+     - "Tokyo weather across the year" -> one query per season (spring/summer/autumn/winter).
+     - "How does X change before vs after Y" -> separate "before" and "after" queries.
+     - "Compare A vs B on cost, safety, and performance" -> one query per dimension if needed.
+   - If the request implies a specific source or format, use search operators (dorks) like `site:`, `filetype:`, `intitle:` where appropriate.
+   - If the request is for a specific URL or navigation, generate a `site:` query or the exact URL if appropriate.
+7. Keep each query concise, specific, and optimized for a search engine. Avoid redundancy.
+8. Do not invent extra constraints (years, geographies, “latest/today/current”) unless the user explicitly asked for them.
 
 **No added constraints:**
 8. Do NOT add extra constraints or assumptions that are not explicitly present in the user request.
