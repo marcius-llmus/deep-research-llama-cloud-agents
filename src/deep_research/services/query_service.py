@@ -24,7 +24,8 @@ class QueryService:
     def __init__(self, llm_config: LLMModelConfig):
         self.llm = GoogleGenAI(
             model=llm_config.model,
-            temperature=llm_config.temperature
+            temperature=llm_config.temperature,
+            reasoning={"thinking_level": "LOW"},
         )
 
     async def decompose_query(self, query: str) -> DecomposedQueryResponse:

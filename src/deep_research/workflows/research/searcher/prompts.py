@@ -20,6 +20,7 @@ How to use the tools:
 
 - After every web_search, read sources.
   Pick URLs from that web_search output and call generate_evidences. Don’t keep searching without processing sources.
+  You MUST use the EXACT URLs returned by the web_search tool.
   Read in batches (up to 5 URLs per generate_evidences call).
 
 - If evidence is weak or incomplete, refine safely.

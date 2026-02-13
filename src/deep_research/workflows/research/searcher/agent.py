@@ -24,7 +24,8 @@ searcher_cfg = cfg.searcher
 
 llm = GoogleGenAI(
     model=searcher_cfg.main_llm.model,
-    temperature=searcher_cfg.main_llm.temperature
+    temperature=searcher_cfg.main_llm.temperature,
+    reasoning={"thinking_level": "MEDIUM"},
 )
 
 web_search_service = WebSearchService()

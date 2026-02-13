@@ -16,7 +16,8 @@ writer_cfg = cfg.writer
 
 llm = GoogleGenAI(
     model=writer_cfg.main_llm.model,
-    temperature=writer_cfg.main_llm.temperature
+    temperature=writer_cfg.main_llm.temperature,
+    reasoning={"thinking_level": "HIGH"},
 )
 
 tools_spec = WriterTools(config=cfg)

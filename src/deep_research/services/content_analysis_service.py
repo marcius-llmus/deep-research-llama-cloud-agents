@@ -17,7 +17,8 @@ class ContentAnalysisService:
     def __init__(self, llm_config: LLMModelConfig):
         self.llm = GoogleGenAI(
             model=llm_config.model,
-            temperature=llm_config.temperature
+            temperature=llm_config.temperature,
+            reasoning={"thinking_level": "LOW"},
         )
 
     async def analyze_parsed_document(self, evidence: ParsedDocument, directive: str) -> InsightExtractionResponse:
