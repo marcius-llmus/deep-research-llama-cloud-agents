@@ -34,6 +34,9 @@ How to use the tools:
 - If web_search returns MAX_NO_NEW_RESULTS_REACHED, stop searching.
   This means you are stuck. Do not plan new queries. Do not search again.
   You must either generate evidence from URLs you already found or finalize the research immediately.
+
+- If a tool returns TOOL_ERROR, treat it as a transient tool failure.
+  You may retry once (preferably with a smaller batch or a simpler query). If it fails again, stop looping and finalize with what you have.
 """
 
 REFINEMENT_PROTOCOL_SECTION_TMPL = """\

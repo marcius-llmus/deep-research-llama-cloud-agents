@@ -545,7 +545,7 @@ def run_searcher(
 ) -> Callable[..., Coroutine[Any, Any, tuple[DeepResearchState, list[ToolEvent], Any, Path]]]:
     async def _run(*, user_msg: str, trace_name: str = "searcher"):
         ctx = Context(searcher_agent)
-        handler = searcher_agent.run(user_msg=user_msg, ctx=ctx)
+        handler = searcher_agent.run(user_msg=user_msg, ctx=ctx, max_iterations=60)
         
         # Collect events with real-time streaming
         events = await _collect_tool_events(handler)

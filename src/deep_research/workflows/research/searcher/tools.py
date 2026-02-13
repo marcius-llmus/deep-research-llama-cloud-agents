@@ -48,8 +48,11 @@ class SearcherTools(BaseToolSpec):
             ),
         ],
     ) -> str:
+        try:
+            decomposed = await self.query_service.decompose_query(query=query)
+        except BaseException as e:
+            return f"TOOL_ERROR\nplan_search_queries failed: {e}"
 
-        decomposed = await self.query_service.decompose_query(query=query)
         queries = [q for q in decomposed.queries if q.strip()]
         return "\n".join(queries)
 
@@ -75,10 +78,16 @@ class SearcherTools(BaseToolSpec):
                 "2) Call finalize_research if evidence is already sufficient\n"
             )
 
-        search_data, _requests_made = await self.web_search_service.search_google(
-            query=query,
-            max_results=self.config.searcher.max_results_per_query,
-        )
+        try:
+            search_data, _requests_made = await self.web_search_service.search_google(
+                query=query,
+                max_results=self.config.searcher.max_results_per_query,
+            )
+        except BaseException as e:
+            async with ResearchStateAccessor.edit(ctx) as edit_state:
+                edit_state.research_turn.no_new_results_count += 1
+            return f"TOOL_ERROR\nweb_search failed: {e}"
+
         if not search_data:
             async with ResearchStateAccessor.edit(ctx) as edit_state:
                 edit_state.research_turn.no_new_results_count += 1
@@ -177,12 +186,15 @@ class SearcherTools(BaseToolSpec):
             "\n\n".join([(i.content or "") for i in pending.items])
         )
 
-        new_items, failures, budget_exhausted = await self.evidence_service.generate_evidence(
-            urls,
-            directive,
-            max_total_tokens=self.config.settings.max_pending_evidence_tokens,
-            existing_total_tokens=existing_total_tokens,
-        )
+        try:
+            new_items, failures, budget_exhausted = await self.evidence_service.generate_evidence(
+                urls,
+                directive,
+                max_total_tokens=self.config.settings.max_pending_evidence_tokens,
+                existing_total_tokens=existing_total_tokens,
+            )
+        except BaseException as e:
+            return f"TOOL_ERROR\ngenerate_evidences failed: {e}"
 
         async with ResearchStateAccessor.edit(ctx) as state:
             state.research_turn.add_failed_urls(list(failures))
