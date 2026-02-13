@@ -15,6 +15,7 @@ from deep_research.services.file_service import FileService
 from deep_research.services.models import ParsedDocument
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
+from deep_research.workflows.research.writer.agent import workflow as writer_agent
 from deep_research.workflows.research.state import DeepResearchState, ResearchStateAccessor
 
 
@@ -672,14 +673,26 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
                 )
             )
             continue
-        
-        # Ignore AgentOutput (redundant with stream) and others for console noise
-        # but you can log them if needed.
 
     if is_streaming:
         print()
 
     return events
+
+
+async def _finalize_agent_run(*, ctx: Context, handler: Any, user_msg: str, trace_path: Path):
+    events = await _collect_tool_events(handler)
+    result = await handler
+    state = await ResearchStateAccessor.get(ctx)
+
+    payload = {
+        "user_msg": user_msg,
+        "result": str(getattr(result, "response", result)),
+        "events": [asdict(e) for e in events],
+        "state": state.model_dump(),
+    }
+    trace_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
+    return state, events, result, trace_path
 
 
 @pytest.fixture
@@ -690,21 +703,36 @@ def run_searcher(
     async def _run(*, user_msg: str, trace_name: str = "searcher"):
         ctx = Context(searcher_agent)
         handler = searcher_agent.run(user_msg=user_msg, ctx=ctx, max_iterations=60)
-        
-        # Collect events with real-time streaming
-        events = await _collect_tool_events(handler)
-        
-        result = await handler
-        state = await ResearchStateAccessor.get(ctx)
+
         trace_path = trace_dir / f"{trace_name}.json"
+        return await _finalize_agent_run(
+            ctx=ctx,
+            handler=handler,
+            user_msg=user_msg,
+            trace_path=trace_path,
+        )
+
+    return _run
+
+
+@pytest.fixture
+def run_writer(
+    trace_dir: Path,
+) -> Callable[..., Coroutine[Any, Any, tuple[DeepResearchState, list[ToolEvent], Any, Path]]]:
+    async def _run(*, user_msg: str, initial_state: dict[str, Any] | None = None, trace_name: str = "writer"):
+        ctx = Context(writer_agent)
         
-        payload = {
-            "user_msg": user_msg,
-            "result": str(getattr(result, "response", result)),
-            "events": [asdict(e) for e in events],
-            "state": state.model_dump(),
-        }
-        trace_path.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
-        return state, events, result, trace_path
+        if initial_state:
+            async with ctx.store.edit_state() as store:
+                store[ResearchStateAccessor.KEY] = initial_state
+
+        handler = writer_agent.run(user_msg=user_msg, ctx=ctx, max_iterations=20)
+        trace_path = trace_dir / f"{trace_name}.json"
+        return await _finalize_agent_run(
+            ctx=ctx,
+            handler=handler,
+            user_msg=user_msg,
+            trace_path=trace_path,
+        )
 
     return _run
