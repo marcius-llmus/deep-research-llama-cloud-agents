@@ -4,7 +4,7 @@ from typing import Any
 
 from workflows import Context
 
-from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
+from deep_research.workflows.research.searcher.agent import build_searcher_agent
 from deep_research.workflows.research.state import DeepResearchState, ResearchArtifactStatus
 
 
@@ -53,6 +53,7 @@ def _print_state_snapshot(state: DeepResearchState) -> None:
 
 
 async def main() -> None:
+    searcher_agent = build_searcher_agent()
     ctx = Context(searcher_agent)
 
     print(
