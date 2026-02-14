@@ -11,7 +11,6 @@ from deep_research.services.patch_prompts import (
     get_patch_format_instructions,
     get_patch_format_tool_instructions,
 )
-from deep_research.workflows.research.writer.models import ReviewPatchResponse
 
 
 def _build_apply_patch_metadata() -> ToolMetadata:
@@ -33,17 +32,15 @@ def _build_apply_patch_metadata() -> ToolMetadata:
 class WriterTools(BaseToolSpec):
     spec_functions = [
         "apply_patch",
-        "review_patch",
     ]
 
     def __init__(
         self,
         *,
         config: ResearchConfig,
-        report_patch_service: ReportPatchService | None = None,
     ):
         self.config = config
-        self.report_patch_service = report_patch_service or ReportPatchService()
+        self.report_patch_service = ReportPatchService()
 
     async def apply_patch(
         self,
@@ -51,59 +48,23 @@ class WriterTools(BaseToolSpec):
         diff: str,
     ) -> str:
         state = await ResearchStateAccessor.get(ctx)
-        
-        current_draft = state.research_artifact.turn_draft
-        if current_draft is None:
-            current_draft = state.research_artifact.content
+
+        current_draft = state.research_artifact.turn_draft or state.research_artifact.content
 
         new_content, added, removed = await self.report_patch_service.apply_patch(
             original_text=current_draft,
             patch_text=diff,
         )
 
-        async with ResearchStateAccessor.edit(ctx) as edit_state:
-            if edit_state.research_artifact.turn_draft is None:
-                edit_state.research_artifact.turn_draft = current_draft
-            edit_state.research_artifact.pending_patch_content = new_content
-
-        return (
-            f"Patch applied to buffer. Added {added} lines, removed {removed} lines. "
-            "Please call review_patch to commit this change to the draft."
-        )
-
-    async def review_patch(self, ctx: Context) -> str: # noqa
-        async with ResearchStateAccessor.edit(ctx) as state:
-            pending = state.research_artifact.pending_patch_content
-            current_draft = state.research_artifact.turn_draft
-
-            if pending is None:
-                return ReviewPatchResponse(
-                    decision="rejected",
-                    message="No pending patch to review. Please apply a patch first.",
-                ).model_dump_json()
-
-
-            # todo: maybe we can improve it later
-            if current_draft and len(current_draft) > 100 and len(pending) < len(current_draft) * 0.5:
-                state.research_artifact.pending_patch_content = None
-                return ReviewPatchResponse(
-                    decision="rejected",
-                    message="Patch rejected: Deletes more than 50% of the report content. Please try again.",
-                ).model_dump_json()
-
-            added, removed = self.report_patch_service.count_line_changes(
-                old=current_draft, new=pending
+        if current_draft and len(current_draft) > 100 and len(new_content) < len(current_draft) * 0.5:
+            raise ValueError(
+                "Patch rejected: Deletes more than 50% of the report content. Please try again."
             )
 
-            state.research_artifact.turn_draft = pending
-            state.research_artifact.pending_patch_content = None
+        async with ResearchStateAccessor.edit(ctx) as edit_state:
+            edit_state.research_artifact.turn_draft = new_content
 
-        return ReviewPatchResponse(
-            decision="approved",
-            message="Patch reviewed and committed to draft. You may continue applying patches or call finish_writing.",
-            added_lines=added,
-            removed_lines=removed,
-        ).model_dump_json()
+        return f"Patch applied. Added {added} lines, removed {removed} lines."
 
     async def finish_writing(self, ctx: Context) -> str: # noqa
         """
@@ -113,15 +74,14 @@ class WriterTools(BaseToolSpec):
             draft = state.research_artifact.turn_draft
             
             if draft is None:
-                return "No changes were made in this session."
+                return state.research_artifact.content or ""
 
             state.research_artifact.content = draft
             state.research_artifact.turn_draft = None
-            state.research_artifact.pending_patch_content = None
             
             state.research_turn.clear()
 
-        return "Writing session finished. Report updated."
+        return draft
 
     def to_tool_list(self, *args, **kwargs):
         apply_patch_metadata = _build_apply_patch_metadata()
