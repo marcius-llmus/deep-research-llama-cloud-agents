@@ -7,7 +7,8 @@ from workflows import Context
 
 from deep_research.services.models import ParsedDocumentAsset
 from deep_research.workflows.research.state import DeepResearchState, ResearchArtifactStatus
-from deep_research.workflows.research.writer.agent import workflow as writer_agent
+from deep_research.workflows.research.searcher.models import EvidenceBundle, EvidenceItem
+from deep_research.workflows.research.writer.agent import build_writer_agent
 
 
 def _redact_tool_kwargs(tool_kwargs: Any) -> Any:
@@ -132,13 +133,10 @@ def _build_fake_research_notes(topic: str) -> str:
     return "\n\n---\n\n".join(sections)
 
 
-def _build_writer_user_msg(*, instruction: str, research_notes: str, review_feedback: str | None) -> str:
-    user_msg = "Update the report based on the following research notes and instructions.\n\n"
+def _build_writer_user_msg(*, instruction: str, review_feedback: str | None) -> str:
     if review_feedback:
-        user_msg += f"Review Feedback:\n<feedback>{review_feedback}</feedback>\n\n"
-    user_msg += f"Research Notes:\n<research_notes>{research_notes}</research_notes>\n\n"
-    user_msg += f"Instruction: {instruction}"
-    return user_msg
+        return f"<feedback>{review_feedback}</feedback>\n\n{instruction}"
+    return instruction
 
 
 def _print_report_snapshot(state: DeepResearchState) -> None:
@@ -150,6 +148,7 @@ def _print_report_snapshot(state: DeepResearchState) -> None:
 
 
 async def main() -> None:
+    writer_agent = build_writer_agent()
     ctx = Context(writer_agent)
 
     topic = "Deep research report generation"
@@ -216,12 +215,23 @@ async def main() -> None:
         content_before = state_before.research_artifact.content
 
         print("\nWriterAgent running...")
-        prompt = _build_writer_user_msg(
-            instruction=user_msg,
-            research_notes=research_notes,
-            review_feedback=review_feedback,
-        )
-        handler = writer_agent.run(user_msg=prompt, ctx=ctx)
+
+        async with ctx.store.edit_state() as state:
+            state.research_turn.evidence = EvidenceBundle(
+                items=[
+                    EvidenceItem(
+                        url="https://example.com/synthetic",
+                        title=f"Synthetic notes: {topic}",
+                        metadata={"source": "synthetic"},
+                        summary="Synthetic evidence for manual testing.",
+                        content=research_notes,
+                        assets=[],
+                    )
+                ]
+            )
+
+        instruction = _build_writer_user_msg(instruction=user_msg, review_feedback=review_feedback)
+        handler = writer_agent.run(user_msg=f"Instruction: {instruction}", ctx=ctx)
 
         async for ev in handler.stream_events():
             formatted = _format_event(ev)

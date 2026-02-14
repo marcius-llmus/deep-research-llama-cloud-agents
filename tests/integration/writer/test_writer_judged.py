@@ -75,20 +75,25 @@ async def test_writer_judged_add_section(run_writer, judge_llm):
     # Setup initial state
     original_report = "# My Report\n\n## Introduction\nThis is the intro."
     instruction = "Add a section about 'Cats' based on the notes."
-    research_notes = "Cats are small carnivorous mammals. They are the only domesticated species in the family Felidae."
+    raw_research_notes = "Cats are small carnivorous mammals. They are the only domesticated species in the family Felidae."
+
+    evidence = EvidenceBundle(
+        items=[EvidenceItem(url="http://cats.com", content=raw_research_notes)]
+    )
+    research_notes = evidence.get_content_for_writing()
+
+    writer_user_msg = f"Instruction: {instruction}"
 
     initial_state = DeepResearchState(
         research_artifact=ResearchArtifactState(content=original_report),
         research_turn=ResearchTurnState(
-            evidence=EvidenceBundle(
-                items=[EvidenceItem(url="http://cats.com", content=research_notes)]
-            )
+            evidence=evidence
         )
     ).model_dump()
 
     # Run writer
     state, events, result, trace_path = await run_writer(
-        user_msg=f"Update the report based on the following research notes and instructions.\n\nResearch Notes:\n<research_notes>{research_notes}</research_notes>\n\nInstruction: {instruction}",
+        user_msg=writer_user_msg,
         initial_state=initial_state,
         trace_name="writer_add_section",
     )
