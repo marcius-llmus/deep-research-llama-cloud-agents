@@ -1,8 +1,61 @@
 from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field
 
-from pydantic import BaseModel, Field
 
-from deep_research.workflows.text_config import TextSynthesizerConfig
+class TextSynthesizerConfig(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    synthesis_type: str = Field(
+        default="report",
+        description=(
+            "The intended output type. Free-form string. Examples: report, blog_post, email, tweet, technical_paper."
+        ),
+    )
+    tone: str = Field(
+        default="objective",
+        description=(
+            "Overall tone guideline. Free-form string. Examples: objective, formal, humorous, conversational, noir."
+        ),
+    )
+    point_of_view: str = Field(
+        default="third_person",
+        description=(
+            "Point of view guideline. Free-form string. Examples: first_person, second_person, third_person."
+        ),
+    )
+    language: str = Field(
+        default="english",
+        description=(
+            "Output language guideline. Free-form string. Examples: english, spanish, french. Can be any value."
+        ),
+    )
+    target_audience: str = Field(
+        default="general_audience",
+        description=(
+            "Intended audience guideline. Free-form string. Examples: beginners, students, business, technical_experts."
+        ),
+    )
+    target_words: int | None = Field(
+        default=4000,
+        ge=1,
+        le=100_000,
+        description=(
+            "Approximate target total word count for the final output. Guide, not a strict requirement."
+        ),
+    )
+    output_format: str = Field(
+        default="markdown",
+        description=(
+            "Output format guideline. Free-form string. Examples: markdown, plaintext."
+        ),
+    )
+    custom_instructions: str = Field(
+        default="",
+        description=(
+            "Free-form extra requirements not captured by other fields. Use for mixed tone, section-specific style, "
+            "do/don't lists, special formatting rules, etc."
+        ),
+    )
 
 
 class PlannerAgentOutput(BaseModel):
