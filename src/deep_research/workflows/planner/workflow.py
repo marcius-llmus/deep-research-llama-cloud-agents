@@ -16,36 +16,10 @@ from deep_research.workflows.planner.events import PlannerTurnEvent, PlannerOutp
 
 from deep_research.llm import get_planner_llm_resource
 from deep_research.workflows.planner.models import PlannerAgentOutput, ResearchPlanState
-
+from deep_research.workflows.planner.prompts import build_planner_system_prompt
 
 
 class DeepResearchPlanWorkflow(Workflow):
-    _SYSTEM_PROMPT = (
-        "You are an expert deep-research planner collaborating with a human.\n\n"
-        "Goal: produce a high-quality research plan through HITL iterations.\n\n"
-        "You MUST output a valid JSON object that matches the PlannerAgentOutput schema.\n\n"
-        "The generated plan must be ready to be accepted. No meta questions about the topic.\n\n"
-        "Plan editing rules:\n"
-        "- If the user asks for ANY change, you MUST update the plan accordingly.\n"
-        "- Preserve the existing plan structure, numbering, and wording as much as possible.\n"
-        "- Do NOT add new sections, new deliverables, new data sources, new methodology, or new scope expansions unless the user explicitly asks.\n"
-        "- Do NOT add a 'Timeline' (or estimates of time/effort) unless the user explicitly asks for timing.\n"
-        "- Always return the FULL revised plan in the 'plan' field (raw text, not JSON).\n"
-        "- Avoid changing the plan between interactions unless the user explicitly asks.\n\n"
-        "Your job: convert the user's request into a compact research plan as questions we will research.\n\n"
-        "Decision policy (HITL):\n"
-        "- decision='propose_plan': Present a plan (initial or revised) for user review.\n"
-        "- decision='finalize': Use this when the user agrees with the plan (e.g., they say 'accept').\n"
-        "  This is the TERMINAL step. The workflow will end here.\n"
-        "- If details are missing in the query, ask clarifying questions in response, and propose the best plan you can.\n"
-    )
-
-    @staticmethod
-    def _build_system_prompt(current_plan: str) -> str:
-        current_plan = (current_plan or "").strip()
-        plan_block = current_plan if current_plan else "(none yet)"
-        return f"{DeepResearchPlanWorkflow._SYSTEM_PROMPT}\n\nCurrent plan:\n{plan_block}\n"
-
     @step
     async def init_session(
         self,
@@ -77,7 +51,10 @@ class DeepResearchPlanWorkflow(Workflow):
         """Run the LLM and parse a structured PlannerAgentOutput."""
 
         state: ResearchPlanState = await ctx.store.get_state()
-        system_prompt = self._build_system_prompt(state.plan_text)
+        system_prompt = build_planner_system_prompt(
+            current_plan=state.plan_text,
+            text_config=state.text_config,
+        )
 
         memory: BaseMemory = await ctx.store.get("memory")
         history = await memory.aget()
@@ -117,6 +94,7 @@ class DeepResearchPlanWorkflow(Workflow):
 
         async with ctx.store.edit_state() as state:
             state.plan_text = ev.output.plan
+            state.text_config = ev.output.text_config
 
         if ev.output.decision != "finalize":
             prefix = (
@@ -176,6 +154,7 @@ class DeepResearchPlanWorkflow(Workflow):
             "status": state.status,
             "initial_query": state.initial_query,
             "plan": plan_text,
+            "text_config": state.text_config.model_dump(),
         }
 
         await llama_cloud_client.beta.agent_data.delete_by_query(
