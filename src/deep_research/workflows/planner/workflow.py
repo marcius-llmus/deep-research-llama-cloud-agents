@@ -98,7 +98,7 @@ class DeepResearchPlanWorkflow(Workflow):
             state.text_config = ev.output.text_config
 
         if ev.output.decision != "finalize":
-            config_block = format_text_config(ev.output.text_config)
+            config_block = format_text_config(ev.output.text_config, with_examples=True)
             prefix = (
                 f"Current Plan:\n{ev.output.plan}\n\n"
                 "-----------------------\n\n"
