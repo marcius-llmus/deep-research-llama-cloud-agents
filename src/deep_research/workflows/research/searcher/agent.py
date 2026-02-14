@@ -20,10 +20,11 @@ cfg = load_config_from_json(
     label="Research Config",
     description="Deep research collection + settings",
 )
-searcher_cfg = cfg.searcher
 
 
 def build_searcher_agent() -> FunctionAgent:
+    searcher_cfg = cfg.searcher
+
     llm = GoogleGenAI(
         model=searcher_cfg.main_llm.model,
         temperature=searcher_cfg.main_llm.temperature,
