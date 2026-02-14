@@ -14,8 +14,8 @@ from deep_research.services.document_parser_service import DocumentParserService
 from deep_research.services.file_service import FileService
 from deep_research.services.models import ParsedDocument
 from deep_research.services.web_search_service import WebSearchService
-from deep_research.workflows.research.searcher.agent import workflow as searcher_agent
-from deep_research.workflows.research.writer.agent import workflow as writer_agent
+from deep_research.workflows.research.searcher.agent import build_searcher_agent
+from deep_research.workflows.research.writer.agent import build_writer_agent
 from deep_research.workflows.research.state import DeepResearchState, ResearchStateAccessor
 
 
@@ -701,6 +701,7 @@ def run_searcher(
     trace_dir: Path,
 ) -> Callable[..., Coroutine[Any, Any, tuple[DeepResearchState, list[ToolEvent], Any, Path]]]:
     async def _run(*, user_msg: str, trace_name: str = "searcher"):
+        searcher_agent = build_searcher_agent()
         ctx = Context(searcher_agent)
         handler = searcher_agent.run(user_msg=user_msg, ctx=ctx, max_iterations=60)
 
@@ -720,6 +721,7 @@ def run_writer(
     trace_dir: Path,
 ) -> Callable[..., Coroutine[Any, Any, tuple[DeepResearchState, list[ToolEvent], Any, Path]]]:
     async def _run(*, user_msg: str, initial_state: dict[str, Any] | None = None, trace_name: str = "writer"):
+        writer_agent = build_writer_agent()
         ctx = Context(writer_agent)
         
         if initial_state:
