@@ -1,0 +1,28 @@
+from typing import List, Sequence
+
+from llama_index.core.agent.workflow import FunctionAgent, AgentOutput
+from llama_index.core.llms import ChatMessage
+from llama_index.core.memory import BaseMemory
+from llama_index.core.tools import AsyncBaseTool
+from workflows import Context
+
+from deep_research.workflows.research.state import ResearchStateAccessor
+from deep_research.workflows.research.writer.prompts import build_writer_hot_system_prompt
+
+
+class WriterAgent(FunctionAgent):
+    async def take_step(
+        self,
+        ctx: Context,
+        llm_input: List[ChatMessage],
+        tools: Sequence[AsyncBaseTool],
+        memory: BaseMemory,
+    ) -> AgentOutput:
+        state = await ResearchStateAccessor.get(ctx)
+        hot_system_prompt = build_writer_hot_system_prompt(state)
+
+        if not llm_input or llm_input[0].role != "system":
+            raise ValueError("WriterAgent expects a system message at index 0.")
+
+        llm_input[0].content = hot_system_prompt
+        return await super().take_step(ctx, llm_input, tools, memory)
