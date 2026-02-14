@@ -18,8 +18,7 @@ def format_text_config(
         "custom_instructions": "Do/don't lists, Special formatting rules, Section-specific requirements",
     }
 
-    def _format_value(label: str, value: object) -> str:
-        value = "" if value is None else str(value)
+    def _format_value(label: str, value: str) -> str:
         if with_examples and label in examples:
             return f"{value} ({examples[label]})".strip()
         return value
@@ -33,11 +32,13 @@ def format_text_config(
         f"- point_of_view: {_format_value('point_of_view', cfg.point_of_view)}",
         f"- language: {_format_value('language', cfg.language)}",
         f"- target_audience: {_format_value('target_audience', cfg.target_audience)}",
-        f"- target_words: {_format_value('target_words', cfg.target_words)}",
+        f"- target_words: {cfg.target_words}",
         f"- output_format: {_format_value('output_format', cfg.output_format)}",
     ]
 
     if cfg.custom_instructions.strip():
-        lines.append(f"- custom_instructions: {_format_value('custom_instructions', cfg.custom_instructions.strip())}")
+        lines.append(
+            f"- custom_instructions: {_format_value('custom_instructions', cfg.custom_instructions.strip())}"
+        )
 
     return "\n".join(lines)

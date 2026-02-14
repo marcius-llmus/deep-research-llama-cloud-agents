@@ -8,31 +8,31 @@ class TextSynthesizerConfig(BaseModel):
     synthesis_type: str = Field(
         default="report",
         description=(
-            "The intended output type. Free-form string. Examples: report, blog_post, email, tweet, technical_paper."
+            "The intended output type. Free-form string. Examples: Report, Blog post, Email, Tweet, Technical paper."
         ),
     )
     tone: str = Field(
         default="objective",
         description=(
-            "Overall tone guideline. Free-form string. Examples: objective, formal, humorous, conversational, noir."
+            "Overall tone guideline. Free-form string. Examples: Objective, Formal, Humorous, Conversational, Noir."
         ),
     )
     point_of_view: str = Field(
         default="third_person",
         description=(
-            "Point of view guideline. Free-form string. Examples: first_person, second_person, third_person."
+            "Point of view guideline. Free-form string. Examples: First person, Second person, Third person."
         ),
     )
     language: str = Field(
         default="english",
         description=(
-            "Output language guideline. Free-form string. Examples: english, spanish, french. Can be any value."
+            "Output language guideline. Free-form string. Examples: English, Spanish, French. Can be any value."
         ),
     )
     target_audience: str = Field(
         default="general_audience",
         description=(
-            "Intended audience guideline. Free-form string. Examples: beginners, students, business, technical_experts."
+            "Intended audience guideline. Free-form string. Examples: General audience, Beginners, Students, Business, Technical experts."
         ),
     )
     target_words: int | None = Field(
@@ -46,14 +46,14 @@ class TextSynthesizerConfig(BaseModel):
     output_format: str = Field(
         default="markdown",
         description=(
-            "Output format guideline. Free-form string. Examples: markdown, plaintext."
+            "Output format guideline. Free-form string. Examples: Markdown, Plaintext."
         ),
     )
     custom_instructions: str = Field(
         default="",
         description=(
             "Free-form extra requirements not captured by other fields. Use for mixed tone, section-specific style, "
-            "do/don't lists, special formatting rules, etc."
+            "Do/don't lists, special formatting rules, etc."
         ),
     )
 
