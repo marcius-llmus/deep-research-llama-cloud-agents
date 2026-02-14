@@ -17,6 +17,7 @@ from deep_research.workflows.planner.events import PlannerTurnEvent, PlannerOutp
 from deep_research.llm import get_planner_llm_resource
 from deep_research.workflows.planner.models import PlannerAgentOutput, ResearchPlanState
 from deep_research.workflows.planner.prompts import build_planner_system_prompt
+from deep_research.workflows.planner.utils import format_text_config
 
 
 class DeepResearchPlanWorkflow(Workflow):
@@ -97,11 +98,14 @@ class DeepResearchPlanWorkflow(Workflow):
             state.text_config = ev.output.text_config
 
         if ev.output.decision != "finalize":
+            config_block = format_text_config(ev.output.text_config)
             prefix = (
                 f"Current Plan:\n{ev.output.plan}\n\n"
                 "-----------------------\n\n"
                 f"\n{ev.output.response}\n\n"
-                "If the actual plan is good enough, type 'accept' to approve, or reply with edits."
+                "-----------------------\n\n"
+                f"{config_block}\n\n"
+                "If the actual plan is good enough, type 'accept' to approve, or reply with edits.\n\n"
             )
             return InputRequiredEvent(prefix=prefix)  # noqa
 
@@ -119,12 +123,18 @@ class DeepResearchPlanWorkflow(Workflow):
         
         final_state = await ctx.store.get_state()
         plan_text = final_state.plan_text
+        config_block = format_text_config(final_state.text_config)
+        plan_with_config = (
+            f"{(plan_text or '').rstrip()}\n\n"
+            "-----------------------\n\n"
+            f"{config_block}\n"
+        )
         
         item_id = await self._persist_session(
             llama_cloud_client=llama_cloud_client,
             research_config=research_config,
             state=final_state,
-            plan_text=plan_text,
+            plan_text=plan_with_config,
         )
 
         return StopEvent(
@@ -132,7 +142,7 @@ class DeepResearchPlanWorkflow(Workflow):
                 "research_id": final_state.research_id,
                 "status": final_state.status,
                 "agent_data_id": item_id,
-                "plan": plan_text,
+                "plan": plan_with_config,
             }
         )
 

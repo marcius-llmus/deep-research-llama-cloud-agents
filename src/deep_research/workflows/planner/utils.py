@@ -1,8 +1,8 @@
-from deep_research.workflows.text_config import TextSynthesizerConfig
+from deep_research.workflows.planner.models import TextSynthesizerConfig
 
 
 def format_text_config(text_config: TextSynthesizerConfig | dict | None) -> str:
-    cfg = TextSynthesizerConfig.model_validate(text_config or {})
+    cfg = TextSynthesizerConfig.model_validate(text_config)
 
     lines = [
         "========================",
@@ -17,9 +17,7 @@ def format_text_config(text_config: TextSynthesizerConfig | dict | None) -> str:
         f"- output_format: {cfg.output_format}",
     ]
 
-    custom = (cfg.custom_instructions or "").strip()
-    if custom:
+    if custom := cfg.custom_instructions.strip():
         lines.extend(["", "Custom instructions:", custom])
 
     return "\n".join(lines)
-

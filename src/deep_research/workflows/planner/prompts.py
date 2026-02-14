@@ -1,5 +1,5 @@
-from deep_research.workflows.prompt_parts import format_text_config
-from deep_research.workflows.text_config import TextSynthesizerConfig
+from deep_research.workflows.planner.utils import format_text_config
+from deep_research.workflows.planner.models import TextSynthesizerConfig
 
 
 PLANNER_SYSTEM_PROMPT = """You are an expert deep-research planner collaborating with a human.
