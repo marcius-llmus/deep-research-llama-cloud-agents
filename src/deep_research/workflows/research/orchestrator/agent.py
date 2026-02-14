@@ -38,7 +38,11 @@ class OrchestratorWorkflow(Workflow):
             state.orchestrator.research_plan = plan_text
             current_state = state.model_copy()
 
-        dynamic_system_prompt = build_orchestrator_system_prompt(current_state)
+        dynamic_system_prompt = build_orchestrator_system_prompt(
+            research_plan=current_state.orchestrator.research_plan,
+            actual_research=current_state.research_artifact.content,
+            evidence_summary=current_state.research_turn.evidence.get_summary(),
+        )
 
         agent = OrchestratorAgent(
             name="Orchestrator",

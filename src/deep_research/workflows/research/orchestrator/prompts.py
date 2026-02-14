@@ -102,13 +102,14 @@ Output policy:
 - Keep any non-tool text minimal and action-oriented.
 """
 
-def build_orchestrator_system_prompt(state: DeepResearchState) -> str:
-    research_plan = state.orchestrator.research_plan
-    report_content = state.research_artifact.content
-    evidence_summary = state.research_turn.evidence.get_summary()
-
+def build_orchestrator_system_prompt(
+    *,
+    research_plan: str,
+    actual_research: str,
+    evidence_summary: str,
+) -> str:
     return ORCHESTRATOR_SYSTEM_TEMPLATE.format(
         research_plan=research_plan,
-        actual_research=report_content,
+        actual_research=actual_research,
         evidence_summary=evidence_summary,
     )

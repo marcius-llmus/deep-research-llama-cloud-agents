@@ -28,7 +28,11 @@ class OrchestratorAgent(FunctionAgent):
         memory: BaseMemory,
     ) -> AgentOutput:
         state = await ResearchStateAccessor.get(ctx)
-        hot_system_prompt = build_orchestrator_system_prompt(state)
+        hot_system_prompt = build_orchestrator_system_prompt(
+            research_plan=state.orchestrator.research_plan,
+            actual_research=state.research_artifact.content,
+            evidence_summary=state.research_turn.evidence.get_summary(),
+        )
 
         if not llm_input or llm_input[0].role != "system":
             raise ValueError("OrchestratorAgent expects a system message at index 0.")
