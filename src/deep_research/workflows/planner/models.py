@@ -3,8 +3,6 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class TextSynthesizerConfig(BaseModel):
-    model_config = ConfigDict(extra="allow")
-
     synthesis_type: str = Field(
         default="report",
         description=(

@@ -15,7 +15,7 @@ from deep_research.config import ResearchConfig
 from deep_research.workflows.planner.events import PlannerTurnEvent, PlannerOutputEvent, PlanStartEvent
 
 from deep_research.llm import get_planner_llm_resource
-from deep_research.workflows.planner.models import PlannerAgentOutput, ResearchPlanState
+from deep_research.workflows.planner.models import PlannerAgentOutput, ResearchPlanState, TextSynthesizerConfig
 from deep_research.workflows.planner.prompts import build_planner_system_prompt
 from deep_research.workflows.planner.utils import format_text_config
 
@@ -37,6 +37,7 @@ class DeepResearchPlanWorkflow(Workflow):
             state.research_id = str(uuid.uuid4())
             state.status = "planning"
             state.plan_text = ""
+            state.text_config = TextSynthesizerConfig()
 
         await ctx.store.set("memory", ChatMemoryBuffer.from_defaults(llm=planner_llm))
 
