@@ -672,6 +672,13 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
             
             # Pretty print tool call
             print(f"\n🔨 ToolCall: {tool_name}", flush=True)
+
+            if tool_name == "call_research_agent" and "prompt" in tool_kwargs:
+                prompt = str(tool_kwargs.get("prompt") or "")
+                print(f"   Prompt: {prompt}", flush=True)
+            elif tool_name == "call_write_agent" and "instruction" in tool_kwargs:
+                instruction = str(tool_kwargs.get("instruction") or "")
+                print(f"   Instruction: {instruction}", flush=True)
             
             if "query" in tool_kwargs:
                 print(f"   Query: {tool_kwargs['query']}", flush=True)
