@@ -74,8 +74,9 @@ class WriterTools(BaseToolSpec):
             draft = state.research_artifact.turn_draft
             
             if draft is None:
-                return state.research_artifact.content or ""
+                raise ValueError("draft should not be empty")
 
+            # todo: not needed actually
             state.research_artifact.content = draft
             state.research_artifact.turn_draft = None
             
