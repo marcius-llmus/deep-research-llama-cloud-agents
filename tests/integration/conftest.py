@@ -16,7 +16,42 @@ from deep_research.services.models import ParsedDocument
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.workflows.research.searcher.agent import build_searcher_agent
 from deep_research.workflows.research.writer.agent import build_writer_agent
+from deep_research.workflows.research.orchestrator.agent import workflow as orchestrator_workflow
 from deep_research.workflows.research.state import DeepResearchState, ResearchStateAccessor
+
+
+@pytest.fixture
+def batteries_research_plan() -> str:
+    return (
+        "Goal: Produce a cited report comparing solid-state vs lithium-ion batteries.\n"
+        "1) Define solid-state batteries and lithium-ion batteries.\n"
+        "2) Compare energy density and safety (thermal runaway / flammability).\n"
+        "3) Include manufacturing cost / scale challenges if available.\n"
+        "4) Provide a short trade-off summary.\n"
+        "Stop after you have enough evidence to write the report."
+    ).strip()
+
+
+@pytest.fixture
+def empty_research_state_dict() -> dict[str, Any]:
+    return DeepResearchState.model_validate(
+        {
+            "orchestrator": {"research_plan": ""},
+            "research_turn": {
+                "seen_urls": [],
+                "failed_urls": [],
+                "evidence": {"queries": [], "items": []},
+                "follow_up_queries": [],
+                "no_new_results_count": 0,
+            },
+            "research_artifact": {
+                "path": "artifacts/report.md",
+                "content": "",
+                "turn_draft": None,
+                "status": "running",
+            },
+        }
+    ).model_dump()
 
 
 @dataclass
@@ -729,6 +764,34 @@ def run_writer(
                 store[ResearchStateAccessor.KEY] = initial_state
 
         handler = writer_agent.run(user_msg=user_msg, ctx=ctx, max_iterations=20)
+        trace_path = trace_dir / f"{trace_name}.json"
+        return await _finalize_agent_run(
+            ctx=ctx,
+            handler=handler,
+            user_msg=user_msg,
+            trace_path=trace_path,
+        )
+
+    return _run
+
+
+@pytest.fixture
+def run_orchestrator(
+    trace_dir: Path,
+) -> Callable[..., Coroutine[Any, Any, tuple[DeepResearchState, list[ToolEvent], Any, Path]]]:
+    async def _run(
+        *,
+        user_msg: str,
+        initial_state: dict[str, Any] | None = None,
+        trace_name: str = "orchestrator",
+    ):
+        ctx = Context(orchestrator_workflow)
+
+        if initial_state:
+            async with ctx.store.edit_state() as store:
+                store[ResearchStateAccessor.KEY] = initial_state
+
+        handler = orchestrator_workflow.run(user_msg=user_msg, ctx=ctx)
         trace_path = trace_dir / f"{trace_name}.json"
         return await _finalize_agent_run(
             ctx=ctx,
