@@ -686,6 +686,10 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
                 print(f"   Query: {tool_kwargs['original_query']}", flush=True)
             elif "urls" in tool_kwargs:
                 print(f"   URLs: {len(tool_kwargs['urls'])} items", flush=True)
+            elif tool_name == "apply_patch" and "diff" in tool_kwargs:
+                diff = str(tool_kwargs.get("diff") or "")
+                preview = diff[:300] + "..." if len(diff) > 300 else diff
+                print(f"   Patch: {preview}", flush=True)
 
             events.append(
                 ToolEvent(
