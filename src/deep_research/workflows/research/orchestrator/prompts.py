@@ -1,5 +1,3 @@
-from deep_research.workflows.research.state import DeepResearchState
-
 ORCHESTRATOR_SYSTEM_TEMPLATE = """You are the Orchestrator for a deep research run.
 
 You work like a principal investigator. Your job is to drive a strict, dependency-aware loop that turns a plan into a correct report.
@@ -42,6 +40,7 @@ How to use the report for dependency chaining:
 - You MUST read ACTUAL RESEARCH before deciding the next action.
 - Use ACTUAL RESEARCH to determine which plan item is already satisfied and which is the next missing dependency.
 - When moving from dependency A -> B:
+  - Does the new evidence you just gathered contradict or deepen an existing section?
   - Extract the exact definition/conditions for A from the report.
   - Use those conditions to form a targeted Searcher prompt for B.
   - Instruct the Writer to keep language consistent with the A section (including uncertainty/conditions).
@@ -75,6 +74,7 @@ Instruction rules for call_write_agent:
   - exact section headings to update, or
   - exact sentences/phrases that must be preserved/edited.
 - Require explicit conditional phrasing when upstream dependencies are uncertain ("If A..., then B...").
+- If a new finding changes the context of the whole report, instruct the Writer to "Update the Introduction to reflect X" or "Merge Section 2 and 3".
 - Require a short "What we know / What is uncertain" subsection when evidence is mixed.
 - Require explicit attribution by URL in prose or as a small Sources list under the relevant section.
 
