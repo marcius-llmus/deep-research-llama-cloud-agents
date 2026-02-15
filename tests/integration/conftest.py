@@ -16,7 +16,8 @@ from deep_research.services.models import ParsedDocument
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.workflows.research.searcher.agent import build_searcher_agent
 from deep_research.workflows.research.writer.agent import build_writer_agent
-from deep_research.workflows.research.orchestrator.agent import workflow as orchestrator_workflow
+from deep_research.workflows.research.orchestrator.agent import build_orchestrator_agent
+from deep_research.workflows.research.orchestrator.prompts import build_orchestrator_system_prompt
 from deep_research.workflows.research.state import DeepResearchState, ResearchStateAccessor
 
 
@@ -624,6 +625,11 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
     events: list[ToolEvent] = []
     is_streaming = False
 
+    tool_name_aliases = {
+        "_mock_call_research_agent": "call_research_agent",
+        "_mock_call_write_agent": "call_write_agent",
+    }
+
     async for ev in handler.stream_events():
         name = type(ev).__name__
 
@@ -660,6 +666,7 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
                 is_streaming = False
             
             tool_name = getattr(ev, "tool_name", "")
+            tool_name = tool_name_aliases.get(tool_name, tool_name)
             tool_id = getattr(ev, "tool_id", "")
             tool_kwargs = getattr(ev, "tool_kwargs", {})
             
@@ -690,6 +697,7 @@ async def _collect_tool_events(handler: Any) -> list[ToolEvent]:
                 is_streaming = False
 
             tool_name = getattr(ev, "tool_name", "")
+            tool_name = tool_name_aliases.get(tool_name, tool_name)
             tool_id = getattr(ev, "tool_id", "")
             tool_output = getattr(ev, "tool_output", "")
             
@@ -785,13 +793,35 @@ def run_orchestrator(
         initial_state: dict[str, Any] | None = None,
         trace_name: str = "orchestrator",
     ):
-        ctx = Context(orchestrator_workflow)
+        from deep_research.workflows.research.orchestrator import agent as orchestrator_agent_module
 
-        if initial_state:
-            async with ctx.store.edit_state() as store:
-                store[ResearchStateAccessor.KEY] = initial_state
+        original_call_research_agent = orchestrator_agent_module.call_research_agent
+        original_call_write_agent = orchestrator_agent_module.call_write_agent
 
-        handler = orchestrator_workflow.run(user_msg=user_msg, ctx=ctx)
+        async def call_research_agent(ctx: Context, prompt: str) -> str:
+            return await original_call_research_agent(ctx, prompt)
+
+        async def call_write_agent(ctx: Context, instruction: str) -> str:
+            return await original_call_write_agent(ctx, instruction)
+
+        orchestrator_agent_module.call_research_agent = call_research_agent
+        orchestrator_agent_module.call_write_agent = call_write_agent
+
+        state_obj = DeepResearchState.model_validate(initial_state)
+
+        dynamic_system_prompt = build_orchestrator_system_prompt(
+            research_plan=state_obj.orchestrator.research_plan,
+            actual_research=state_obj.research_artifact.content,
+            evidence_summary=state_obj.research_turn.evidence.get_summary(),
+        )
+
+        orchestrator_agent = build_orchestrator_agent(dynamic_system_prompt)
+        ctx = Context(orchestrator_agent)
+
+        async with ctx.store.edit_state() as store:
+            store[ResearchStateAccessor.KEY] = state_obj.model_dump()
+
+        handler = orchestrator_agent.run(user_msg=user_msg, ctx=ctx, max_iterations=60)
         trace_path = trace_dir / f"{trace_name}.json"
         return await _finalize_agent_run(
             ctx=ctx,

@@ -8,6 +8,8 @@ from deep_research.workflows.research.state import DeepResearchState
 from deep_research.workflows.research.orchestrator import tools as orchestrator_tools
 from deep_research.workflows.research.state import ResearchStateAccessor
 from deep_research.workflows.research.searcher.models import EvidenceBundle, EvidenceItem
+from deep_research.workflows.research.orchestrator import agent as orchestrator_agent_module
+from deep_research.workflows.research.orchestrator import agent as orchestrator_agent_module
 
 
 class OrchestratorJudgeVerdict(BaseModel):
@@ -147,8 +149,8 @@ async def test_orchestrator_judged_happy_path(
 
         return "Writing session finished. Report updated."
 
-    monkeypatch.setattr(orchestrator_tools, "call_research_agent", _mock_call_research_agent)
-    monkeypatch.setattr(orchestrator_tools, "call_write_agent", _mock_call_write_agent)
+    monkeypatch.setattr(orchestrator_agent_module, "call_research_agent", _mock_call_research_agent)
+    monkeypatch.setattr(orchestrator_agent_module, "call_write_agent", _mock_call_write_agent)
 
     state, events, result, trace_path = await run_orchestrator(
         user_msg=research_plan,
