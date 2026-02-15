@@ -1,0 +1,75 @@
+{
+  "case_id": "doj_news_seed",
+  "writer_user_msg": "Instruction: Create a report titled \"Latest DOJ Newsroom Updates\" summarizing the three most recent press releases found in the evidence. \n\nStructure the report as follows:\n# Latest DOJ Newsroom Updates\n\n## 1. [Headline of the most recent update]\n- **Date:** [Date]\n- **Summary:** [Key points including scope, next steps, or guidance]\n- **Source:** [URL]\n\n## 2. [Headline of the second most recent update]\n- **Date:** [Date]\n- **Summary:** [Key points including allegations and settlement terms]\n- **Source:** [URL]\n\n## 3. [Headline of the third most recent update]\n- **Date:** [Date]\n- **Summary:** [Brief summary of the enforcement action]\n- **Source:** [URL]\n\nUse the following data:\n1. Feb 20, 2026: Civil Rights Investigation Update (https://justice-example.gov/press/feb-2026-civil-rights-update)\n2. Feb 12, 2026: Antitrust Division Settlement (https://justice-example.gov/press/feb-2026-antitrust-settlement)\n3. Jan 30, 2026: Example Enforcement Action (https://justice-example.gov/press/doj-enforcement)",
+  "initial_state": {
+    "orchestrator": {
+      "research_plan": "Goal: Summarize the latest DOJ newsroom updates (from official press releases).\n1) Identify the most recent 2-3 updates.\n2) For each, summarize the headline and key points.\n3) Include dates and cite the official URLs.\nStop after you have enough evidence to write the report."
+    },
+    "research_turn": {
+      "seen_urls": [
+        "https://justice-example.gov/news",
+        "https://justice-example.gov/press/doj-enforcement",
+        "https://justice-example.gov/press/feb-2026-antitrust-settlement",
+        "https://justice-example.gov/press/feb-2026-civil-rights-update"
+      ],
+      "failed_urls": [],
+      "evidence": {
+        "queries": [],
+        "items": [
+          {
+            "url": "https://justice-example.gov/news",
+            "title": "news",
+            "metadata": {
+              "world": "doj"
+            },
+            "summary": "Latest DOJ newsroom updates and announcements. Feb 20, 2026: Civil Rights Investigation Update (press release)Feb 12, 2026: Antitrust Division Settlement (press release)Jan 30, 2026: Example Enforcement Action (press release)",
+            "content": "# DOJ Newsroom\nLatest DOJ newsroom updates and announcements.\n\nFeb 20, 2026: Civil Rights Investigation Update (press release)Feb 12, 2026: Antitrust Division Settlement (press release)Jan 30, 2026: Example Enforcement Action (press release)",
+            "assets": []
+          },
+          {
+            "url": "https://justice-example.gov/press/feb-2026-antitrust-settlement",
+            "title": "feb-2026-antitrust-settlement",
+            "metadata": {
+              "world": "doj"
+            },
+            "summary": "On Feb 12, 2026, the DOJ Antitrust Division announced a settlement in a major case. Key points: alleged anti-competitive conduct; settlement terms include compliance commitments and penalties.",
+            "content": "# Feb 12, 2026 - DOJ Antitrust Division Settlement\nOn Feb 12, 2026, the DOJ Antitrust Division announced a settlement in a major case.\n\nKey points: alleged anti-competitive conduct; settlement terms include compliance commitments and penalties.",
+            "assets": []
+          },
+          {
+            "url": "https://justice-example.gov/press/feb-2026-civil-rights-update",
+            "title": "feb-2026-civil-rights-update",
+            "metadata": {
+              "world": "doj"
+            },
+            "summary": "On Feb 20, 2026, the DOJ Civil Rights Division provided an update on an investigation. Key points: scope of investigation, next steps, and public guidance.",
+            "content": "# Feb 20, 2026 - Civil Rights Investigation Update\nOn Feb 20, 2026, the DOJ Civil Rights Division provided an update on an investigation.\n\nKey points: scope of investigation, next steps, and public guidance.",
+            "assets": []
+          },
+          {
+            "url": "https://justice-example.gov/press/doj-enforcement",
+            "title": "doj-enforcement",
+            "metadata": {
+              "world": "doj"
+            },
+            "summary": "DOJ announced an enforcement action. This is an official press release.",
+            "content": "# DOJ Enforcement Action\nDOJ announced an enforcement action. This is an official press release.",
+            "assets": []
+          }
+        ]
+      },
+      "follow_up_queries": [],
+      "no_new_results_count": 0
+    },
+    "research_artifact": {
+      "path": "artifacts/report.md",
+      "content": "",
+      "turn_draft": null,
+      "status": "running"
+    }
+  },
+  "plan": "Goal: Summarize the latest DOJ newsroom updates (from official press releases).\n1) Identify the most recent 2-3 updates.\n2) For each, summarize the headline and key points.\n3) Include dates and cite the official URLs.\nStop after you have enough evidence to write the report.",
+  "research_prompts": [
+    "Find the 3 most recent press releases from the official U.S. Department of Justice (DOJ) newsroom (justice.gov/news). For each, provide the date, the headline, the official URL, and a brief summary of the key points."
+  ]
+}

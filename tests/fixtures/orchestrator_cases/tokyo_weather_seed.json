@@ -1,0 +1,75 @@
+{
+  "case_id": "tokyo_weather_seed",
+  "writer_user_msg": "Instruction: Create a comprehensive report on Tokyo's seasonal weather based on the provided evidence. \n\nThe report should include:\n1. An introduction stating that Tokyo has four distinct seasons.\n2. A section for each season (Spring, Summer, Autumn, Winter) detailing:\n   - Typical temperature ranges (Highs/Lows in Celsius).\n   - Precipitation patterns and humidity levels.\n   - Key seasonal highlights (e.g., cherry blossoms in Spring, rainy season/typhoons in Summer, foliage in Autumn, snow likelihood in Winter).\n3. A compact comparison table at the end summarizing High/Low Temps, Precipitation, and Humidity for all four seasons.\n\nUse the following data points:\n- Spring: Highs 15-22C, Lows 7-14C; Precip 110-140mm; Humidity 55-65%; Cherry blossoms late March/early April.\n- Summer: Highs 28-33C, Lows 22-26C; Precip 150-210mm; Humidity 70-85%; Rainy season early summer, typhoons later.\n- Autumn: Highs 18-26C, Lows 10-18C; Precip 120-170mm; Humidity 55-70%; Foliage peaks in November.\n- Winter: Highs 8-12C, Lows 1-5C; Precip 40-70mm; Humidity 45-60%; Snow is infrequent.\n\nCite the sources as provided in the evidence summary.",
+  "initial_state": {
+    "orchestrator": {
+      "research_plan": "Goal: Compare the weather in Tokyo during all seasons of the year.\n1) Summarize typical temperatures by season (highs/lows).\n2) Summarize precipitation and humidity by season.\n3) Mention notable seasonal notes (e.g., cherry blossoms, rainy season, foliage, snow likelihood).\n4) Provide a compact comparison table.\nStop after you have enough evidence to write the report."
+    },
+    "research_turn": {
+      "seen_urls": [
+        "https://weather-example.com/tokyo-autumn",
+        "https://weather-example.com/tokyo-spring",
+        "https://weather-example.com/tokyo-summer",
+        "https://weather-example.com/tokyo-winter"
+      ],
+      "failed_urls": [],
+      "evidence": {
+        "queries": [],
+        "items": [
+          {
+            "url": "https://weather-example.com/tokyo-spring",
+            "title": "tokyo-spring",
+            "metadata": {
+              "world": "tokyo_weather"
+            },
+            "summary": "Spring is mild. Average highs 15-22C, lows 7-14C. Typical precipitation: 110-140 mm/month. Humidity is moderate (55-65%). Seasonal note: cherry blossom season typically peaks in late March to early April.",
+            "content": "# Tokyo Spring Weather\nSpring is mild. Average highs 15-22C, lows 7-14C.\n\nTypical precipitation: 110-140 mm/month. Humidity is moderate (55-65%).\n\nSeasonal note: cherry blossom season typically peaks in late March to early April.",
+            "assets": []
+          },
+          {
+            "url": "https://weather-example.com/tokyo-summer",
+            "title": "tokyo-summer",
+            "metadata": {
+              "world": "tokyo_weather"
+            },
+            "summary": "Summer is hot and humid. Average highs 28-33C, lows 22-26C. Typical precipitation: 150-210 mm/month. Humidity is high (70-85%). Seasonal note: rainy season typically occurs in early summer; typhoons can occur later in summer.",
+            "content": "# Tokyo Summer Weather\nSummer is hot and humid. Average highs 28-33C, lows 22-26C.\n\nTypical precipitation: 150-210 mm/month. Humidity is high (70-85%).\n\nSeasonal note: rainy season typically occurs in early summer; typhoons can occur later in summer.",
+            "assets": []
+          },
+          {
+            "url": "https://weather-example.com/tokyo-autumn",
+            "title": "tokyo-autumn",
+            "metadata": {
+              "world": "tokyo_weather"
+            },
+            "summary": "Autumn is cooler and comfortable. Average highs 18-26C, lows 10-18C. Typical precipitation: 120-170 mm/month, generally lower than summer. Humidity 55-70%. Seasonal note: autumn foliage typically peaks in November.",
+            "content": "# Tokyo Autumn Weather\nAutumn is cooler and comfortable. Average highs 18-26C, lows 10-18C.\n\nTypical precipitation: 120-170 mm/month, generally lower than summer. Humidity 55-70%.\n\nSeasonal note: autumn foliage typically peaks in November.",
+            "assets": []
+          },
+          {
+            "url": "https://weather-example.com/tokyo-winter",
+            "title": "tokyo-winter",
+            "metadata": {
+              "world": "tokyo_weather"
+            },
+            "summary": "Winter is cool and relatively dry. Average highs 8-12C, lows 1-5C. Typical precipitation: 40-70 mm/month. Humidity 45-60%. Snow is infrequent but possible.",
+            "content": "# Tokyo Winter Weather\nWinter is cool and relatively dry. Average highs 8-12C, lows 1-5C.\n\nTypical precipitation: 40-70 mm/month. Humidity 45-60%.\n\nSnow is infrequent but possible.",
+            "assets": []
+          }
+        ]
+      },
+      "follow_up_queries": [],
+      "no_new_results_count": 0
+    },
+    "research_artifact": {
+      "path": "artifacts/report.md",
+      "content": "",
+      "turn_draft": null,
+      "status": "running"
+    }
+  },
+  "plan": "Goal: Compare the weather in Tokyo during all seasons of the year.\n1) Summarize typical temperatures by season (highs/lows).\n2) Summarize precipitation and humidity by season.\n3) Mention notable seasonal notes (e.g., cherry blossoms, rainy season, foliage, snow likelihood).\n4) Provide a compact comparison table.\nStop after you have enough evidence to write the report.",
+  "research_prompts": [
+    "Research typical weather patterns in Tokyo, Japan across all four seasons (Spring, Summer, Autumn, Winter). \nFor each season, provide:\n- Average high and low temperatures (Celsius and Fahrenheit).\n- Average monthly precipitation levels and number of rainy days.\n- Average humidity levels.\n- Specific timing for the rainy season (Tsuyu) and typhoon season.\n- Likelihood of snow in winter.\nPlease provide data from reliable sources like the Japan Meteorological Agency or similar climate databases."
+  ]
+}
