@@ -18,11 +18,22 @@ cfg = load_config_from_json(
     label="Research Config",
     description="Deep research collection + settings",
 )
-llm_cfg = cfg.orchestrator.main_llm
-llm = GoogleGenAI(model=llm_cfg.model, temperature=llm_cfg.temperature)
 
-research_tool = FunctionTool.from_defaults(fn=call_research_agent)
-write_tool = FunctionTool.from_defaults(fn=call_write_agent)
+
+def build_orchestrator_agent(dynamic_system_prompt) -> OrchestratorAgent:
+    llm_cfg = cfg.orchestrator.main_llm
+    llm = GoogleGenAI(model=llm_cfg.model, temperature=llm_cfg.temperature)
+
+    research_tool = FunctionTool.from_defaults(fn=call_research_agent)
+    write_tool = FunctionTool.from_defaults(fn=call_write_agent)
+
+    return OrchestratorAgent(
+        name="Orchestrator",
+        description="Manages the report generation process.",
+        system_prompt=dynamic_system_prompt,
+        llm=llm,
+        tools=[research_tool, write_tool],
+    )
 
 class OrchestratorWorkflow(Workflow):
     """
@@ -44,13 +55,7 @@ class OrchestratorWorkflow(Workflow):
             evidence_summary=current_state.research_turn.evidence.get_summary(),
         )
 
-        agent = OrchestratorAgent(
-            name="Orchestrator",
-            description="Manages the report generation process.",
-            system_prompt=dynamic_system_prompt,
-            llm=llm,
-            tools=[research_tool, write_tool],
-        )
+        agent = build_orchestrator_agent(dynamic_system_prompt)
 
         result = await agent.run(user_msg="Start the research", ctx=ctx)
         return StopEvent(result=result)
