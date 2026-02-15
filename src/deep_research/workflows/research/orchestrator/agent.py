@@ -49,7 +49,7 @@ class OrchestratorWorkflow(Workflow):
             state.orchestrator.research_plan = plan_text
             current_state = state.model_copy()
 
-        dynamic_system_prompt = build_orchestrator_system_prompt(
+        dynamic_system_prompt = build_orchestrator_system_prompt( # noqa
             research_plan=current_state.orchestrator.research_plan,
             actual_research=current_state.research_artifact.content,
             evidence_summary=current_state.research_turn.evidence.get_summary(),
@@ -57,7 +57,21 @@ class OrchestratorWorkflow(Workflow):
 
         agent = build_orchestrator_agent(dynamic_system_prompt)
 
-        result = await agent.run(user_msg="Start the research", ctx=ctx)
+        agent_ctx = Context(agent)
+        async with agent_ctx.store.edit_state() as store:
+            store[ResearchStateAccessor.KEY] = current_state.model_dump()
+
+        handler = await agent.run(user_msg="Start the research", ctx=agent_ctx)
+
+        async for event in handler.stream_events():
+            ctx.write_event_to_stream(event)
+
+        result = await handler
+
+        final_inner_state = await ResearchStateAccessor.get(agent_ctx)
+        async with ctx.store.edit_state() as store:
+            store[ResearchStateAccessor.KEY] = final_inner_state.model_dump()
+
         return StopEvent(result=result)
 
 workflow = OrchestratorWorkflow(timeout=None)
