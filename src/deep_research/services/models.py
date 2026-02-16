@@ -24,6 +24,7 @@ class ExtractedInsight(BaseModel):
     """A single insight extracted from content."""
     content: str = Field(..., description="The content of the extracted insight.")
     relevance_score: float = Field(..., description="Relevance score between 0.0 and 1.0", ge=0.0, le=1.0)
+    topic_density_score: float = Field(..., description="A score (0.0 to 1.0) indicating how much of the source text is dedicated to this specific insight/topic. High density means the source goes deep into this topic.", ge=0.0, le=1.0)
 
 
 class InsightExtractionResponse(BaseModel):

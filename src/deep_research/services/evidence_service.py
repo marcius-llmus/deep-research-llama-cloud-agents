@@ -156,7 +156,7 @@ class EvidenceService:
                 return evidence.source_url, None, None
 
             summary = "\n".join(
-                f"- {insight.content} (Relevance: {insight.relevance_score:.2f})"
+                f"- {insight.content} (Relevance: {insight.relevance_score:.2f}, Density: {insight.topic_density_score:.2f})"
                 for insight in analysis_result.insights
             )
 

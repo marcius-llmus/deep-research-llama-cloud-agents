@@ -38,6 +38,7 @@ EXTRACT_INSIGHTS_PROMPT = """
 5. Tasks:
    - Extract the most important and directly relevant insights.
    - Assess relevance of each insight (0.0 to 1.0).
+   - Assess topic density of each insight (0.0 to 1.0). This score indicates how much of the source text is dedicated to this specific insight/topic. High density means the source goes deep into this topic.
    - Select which assets (by ID) are critical evidence for the directive.
 
 **Research Directive:**
