@@ -64,7 +64,9 @@ class WriterTools(BaseToolSpec):
         async with ResearchStateAccessor.edit(ctx) as edit_state:
             edit_state.research_artifact.turn_draft = new_content
 
-        return f"Patch applied. Added {added} lines, removed {removed} lines."
+        word_count = len(new_content.split())
+
+        return f"Patch applied successfully.\nStats: +{added} lines, -{removed} lines.\nCURRENT REPORT LENGTH: {word_count} words."
 
     async def finish_writing(self, ctx: Context) -> str: # noqa
         """
