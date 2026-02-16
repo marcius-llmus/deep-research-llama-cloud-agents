@@ -4,10 +4,10 @@ from llama_index.llms.google_genai import GoogleGenAI
 
 from deep_research.config import ResearchConfig
 from deep_research.services.content_analysis_service import ContentAnalysisService
-from deep_research.services.document_parser_service import DocumentParserService
 from deep_research.services.evidence_service import EvidenceService
 from deep_research.services.file_service import FileService
 from deep_research.services.query_service import QueryService
+from deep_research.services.trafilatura_document_parser_service import TrafilaturaDocumentParserService
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.utils import load_config_from_json
 from deep_research.workflows.research.searcher.prompts import build_research_system_prompt
@@ -33,7 +33,7 @@ def build_searcher_agent() -> FunctionAgent:
 
     web_search_service = WebSearchService()
     file_service = FileService()
-    document_parser_service = DocumentParserService()
+    document_parser_service = TrafilaturaDocumentParserService()
 
     query_service = QueryService(llm_config=searcher_cfg.main_llm)
     content_analysis_service = ContentAnalysisService(llm_config=searcher_cfg.weak_llm)
