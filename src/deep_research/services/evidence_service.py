@@ -7,8 +7,8 @@ from typing import List, Optional, Tuple
 from urllib.parse import urlparse
 
 from deep_research.services.content_analysis_service import ContentAnalysisService
-from deep_research.services.document_parser_service import DocumentParserService
 from deep_research.services.file_service import FileService
+from deep_research.services.trafilatura_document_parser_service import TrafilaturaDocumentParserService
 from deep_research.services.web_search_service import WebSearchService
 from deep_research.services.models import ParsedDocument
 from deep_research.services.token_counting_service import TokenCountingService
@@ -30,7 +30,7 @@ class EvidenceService:
         self,
         *,
         content_analysis_service: ContentAnalysisService,
-        document_parser_service: DocumentParserService,
+        document_parser_service: TrafilaturaDocumentParserService,
         file_service: FileService,
         web_search_service: WebSearchService,
     ) -> None:
@@ -51,8 +51,7 @@ class EvidenceService:
         """
         Parses and analyzes URLs to produce enriched EvidenceItems.
         Returns (items, failures, budget_exhausted).
-        This service orchestrates the evidence generation process of downloading, from web, upload to LlamaIndex and parse.
-        Btw, Llama parsing is insane. I don't know waht they do, but you send bytes, it eats the data and return structures.
+        This service orchestrates the evidence generation process of downloading and parsing content.
         """
 
         # this is the downloading part
@@ -69,25 +68,27 @@ class EvidenceService:
             else:
                 valid_downloads.append((url, res))
 
-        # we upload the data to llama index so we can parse by id
-        # this is also good because will allow research point to actual factual data from real docs
-        upload_tasks = [
-            self.file_service.upload_bytes(
-                content,
-                filename=self._build_upload_filename(url=url),
-            )
-            for url, content in valid_downloads
-        ]
-        upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
+        # todo: soon it will be beautiful llama parser
+        # Legacy path:
+        # Upload bytes to LlamaCloud and then parse via LlamaParse (kept for future swap).
+        # upload_tasks = [
+        #     self.file_service.upload_bytes(
+        #         content,
+        #         filename=self._build_upload_filename(url=url),
+        #     )
+        #     for url, content in valid_downloads
+        # ]
+        # upload_results = await asyncio.gather(*upload_tasks, return_exceptions=True)
 
-        files_to_parse: List[Tuple[str, str]] = [] # (file_id, url)
+        files_to_parse: List[Tuple[str | None, str, bytes]] = [] # (file_id, url, content)
         
-        for (url, _), res in zip(valid_downloads, upload_results):
-            if isinstance(res, BaseException):
-                failures.add(url)
-                logger.error(f"Failed to upload {url}: {res}")
-            else:
-                files_to_parse.append((res, url))
+        for url, content in valid_downloads:
+            # if isinstance(res, BaseException):
+            #     failures.add(url)
+            #     logger.error(f"Failed to upload {url}: {res}")
+            # else:
+            #     files_to_parse.append((res, url))
+            files_to_parse.append((None, url, content))
 
         parsed_documents, parse_failures = await self.document_parser_service.parse_files(files_to_parse)
         failures.update(parse_failures)
