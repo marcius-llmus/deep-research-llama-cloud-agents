@@ -26,7 +26,7 @@ class EvidenceBundle(BaseModel):
         
         lines = [f"Gathered {len(self.items)} evidence items:"]
         for i, item in enumerate(self.items, 1):
-            lines.append(f"{i}. {item.url}")
+            lines.append(f"{i}. [{item.title or 'Source'}]({item.url})")
             lines.append(f"   Summary: {item.summary}")
         return "\n".join(lines)
 
@@ -37,7 +37,7 @@ class EvidenceBundle(BaseModel):
 
         sections = []
         for item in self.items:
-            header = f"### Source: {item.title or 'Untitled'} ({item.url})"
+            header = f"### Source: [{item.title or 'Untitled'}]({item.url})"
 
             meta_section = ""
             if item.metadata:
