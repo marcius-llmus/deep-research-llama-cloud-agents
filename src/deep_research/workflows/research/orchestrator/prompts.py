@@ -52,8 +52,6 @@ STATE (WHAT YOU SEE)
 {evidence_summary}
 </evidence_summary>
 
-### 4. Constraints
-Target Word Count: {word_count_target}
 
 ========================
 OPERATIONAL GUIDELINES
@@ -103,11 +101,9 @@ def build_orchestrator_system_prompt(
     research_plan: str,
     actual_research: str,
     evidence_summary: str,
-    word_count_target: int,
 ) -> str:
     return ORCHESTRATOR_SYSTEM_TEMPLATE.format(
         research_plan=research_plan,
         actual_research=actual_research,
         evidence_summary=evidence_summary,
-        word_count_target=word_count_target,
     )
