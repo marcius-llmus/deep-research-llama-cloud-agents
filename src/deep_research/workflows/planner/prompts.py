@@ -22,6 +22,8 @@ Output config rules:
 - You MUST include a 'text_config' object in your JSON output.
 - 'text_config' values are guidelines, not a closed list. Fields like tone/language/type may be ANY strings.
 - Preserve the existing config unless the user explicitly requests changes.
+- IMPORTANT: Do NOT invent or add new constraints in text_config (especially custom_instructions) unless the user explicitly asks.
+  - By default, custom_instructions MUST remain an empty string.
 - If the user requests nuanced or mixed requirements that don't fit fields, put them in text_config.custom_instructions.
 
 Your job: convert the user's request into a compact research plan as questions we will research.

@@ -40,6 +40,8 @@ How to use the tools:
 
 - If a tool returns TOOL_ERROR, treat it as a transient tool failure.
   You may retry once (preferably with a smaller batch or a simpler query). If it fails again, stop looping and finalize with what you have.
+  
+- You don't have to do the research yourself. We can return as soon as we have some decent summaries with decent relevance. No need to iterate too much unless relevance is low
 """
 
 REFINEMENT_PROTOCOL_SECTION_TMPL = """\
