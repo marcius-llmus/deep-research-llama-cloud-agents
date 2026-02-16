@@ -26,8 +26,9 @@ async def main():
     async for ev in handler.stream_events():
         print(f"[Planner Event] {type(ev).__name__}")
         if isinstance(ev, InputRequiredEvent):
-            print("Input required. Auto-accepting.")
-            planner_ctx.send_event(HumanResponseEvent(response="accept"))
+            print(ev.prefix)
+            user_input = input("What do you think: ")
+            planner_ctx.send_event(HumanResponseEvent(response=user_input))
         elif isinstance(ev, StopEvent):
             print("Planner finished.")
             result = ev.result
@@ -64,6 +65,10 @@ async def main():
     state = await ResearchStateAccessor.get(orch_ctx)
     print("\n=== FINAL REPORT ===\n")
     print(state.research_artifact.content)
+
+    with open("final_report.md", "w", encoding="utf-8") as f:
+        f.write(state.research_artifact.content)
+    print("\nSaved to final_report.md")
 
 
 if __name__ == "__main__":
