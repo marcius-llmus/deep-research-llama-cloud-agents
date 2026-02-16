@@ -2,7 +2,7 @@
   "research": {
     "planner": {
       "main_llm": {
-        "model": "gemini-3-flash-preview",
+        "model": "gemini-2.5-flash",
         "temperature": 0.2
       }
     },
@@ -19,19 +19,19 @@
     },
     "orchestrator": {
       "main_llm": {
-        "model": "gemini-3-flash-preview",
+        "model": "gemini-2.5-flash",
         "temperature": 0.2
       }
     },
     "writer": {
       "main_llm": {
-        "model": "gemini-3-flash-preview",
+        "model": "gemini-2.5-flash",
         "temperature": 0.2
       }
     },
     "reviewer": {
       "main_llm": {
-        "model": "gemini-3-flash-preview",
+        "model": "gemini-2.5-flash",
         "temperature": 0.1
       }
     },
