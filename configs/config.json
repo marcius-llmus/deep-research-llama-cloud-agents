@@ -2,36 +2,36 @@
   "research": {
     "planner": {
       "main_llm": {
-        "model": "gemini-2.5-flash-preview-09-2025",
+        "model": "gemini-2.5-flash",
         "temperature": 0.2
       }
     },
     "searcher": {
       "main_llm": {
-        "model": "gemini-2.5-flash-preview-09-2025",
+        "model": "gemini-2.5-flash",
         "temperature": 0.2
       },
       "weak_llm": {
-        "model": "gemini-2.5-flash-lite-preview-09-2025",
+        "model": "gemini-2.5-flash-lite",
         "temperature": 0.1
       },
       "max_results_per_query": 8
     },
     "orchestrator": {
       "main_llm": {
-        "model": "gemini-2.5-flash-preview-09-2025",
+        "model": "gemini-2.5-flash",
         "temperature": 0.2
       }
     },
     "writer": {
       "main_llm": {
-        "model": "gemini-2.5-flash-preview-09-2025",
-        "temperature": 0.5
+        "model": "gemini-2.5-flash",
+        "temperature": 0.2
       }
     },
     "reviewer": {
       "main_llm": {
-        "model": "gemini-2.5-flash-preview-09-2025",
+        "model": "gemini-2.5-flash",
         "temperature": 0.1
       }
     },
