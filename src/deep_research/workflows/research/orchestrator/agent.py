@@ -61,7 +61,7 @@ class OrchestratorWorkflow(Workflow):
         async with agent_ctx.store.edit_state() as store:
             store[ResearchStateAccessor.KEY] = current_state.model_dump()
 
-        handler = await agent.run(user_msg="Start the research", ctx=agent_ctx)
+        handler = agent.run(user_msg="Start the research", ctx=agent_ctx)
 
         async for event in handler.stream_events():
             ctx.write_event_to_stream(event)
